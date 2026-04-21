@@ -81,9 +81,13 @@ export function AgentAvatar({ agent, index }: Props) {
       </div>
 
       {/* Status badge */}
-      <div className="pixel-text" style={{ fontSize: '0.5rem', color: isActive ? '#4ade80' : '#6b7280' }}>
+      <div
+        className="pixel-text max-w-[100px] truncate"
+        style={{ fontSize: '0.5rem', color: isActive ? '#4ade80' : '#6b7280' }}
+        title={isActive && agent.currentIssue ? `${agent.currentIssue.identifier}: ${agent.currentIssue.title}` : undefined}
+      >
         {isActive && agent.activeRun
-          ? `● RUNNING ${formatRunDuration(agent.activeRun.startedAt)}`
+          ? `● RUNNING ${formatRunDuration(agent.activeRun.startedAt)}${agent.currentIssue ? ` · ${agent.currentIssue.identifier}` : ''}`
           : '○ IDLE'}
       </div>
 
@@ -95,9 +99,20 @@ export function AgentAvatar({ agent, index }: Props) {
         >
           <div className="font-bold">{agent.name}</div>
           {agent.title && <div style={{ color: '#94a3b8' }}>{agent.title}</div>}
-          <div style={{ color: isActive ? '#4ade80' : '#6b7280' }}>
-            {isActive ? 'Active run in progress' : 'Idle'}
-          </div>
+          {isActive && agent.currentIssue && (
+            <div
+              className="truncate max-w-[200px]"
+              style={{ color: '#4ade80', fontSize: '0.65rem' }}
+              title={`${agent.currentIssue.identifier}: ${agent.currentIssue.title}`}
+            >
+              {agent.currentIssue.identifier}: {agent.currentIssue.title}
+            </div>
+          )}
+          {(!isActive || !agent.currentIssue) && (
+            <div style={{ color: isActive ? '#4ade80' : '#6b7280' }}>
+              {isActive ? 'Active run in progress' : 'Idle'}
+            </div>
+          )}
         </div>
       </div>
     </div>
