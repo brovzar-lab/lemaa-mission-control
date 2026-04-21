@@ -13,4 +13,5 @@ export interface Agent {
   status: string
   activeRun: ActiveRun | null
   urlKey: string | null
+  currentIssue?: { identifier: string; title: string }
 }
