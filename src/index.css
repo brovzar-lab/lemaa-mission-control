@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-white overflow-x-hidden;
+    font-family: 'Courier New', Courier, monospace;
+  }
+}
+
+/* Pixel font feel via letter-spacing */
+.pixel-text {
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+/* Isometric floor grid */
+.iso-floor {
+  transform: rotateX(30deg) rotateZ(0deg);
+  transform-style: preserve-3d;
+}
+
+/* Active glow effect */
+.agent-active-glow {
+  box-shadow: 0 0 12px 3px currentColor;
+}
+
+/* Scanline overlay for retro effect */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
