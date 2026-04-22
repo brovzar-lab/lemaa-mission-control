@@ -3,9 +3,10 @@ import { AgentAvatar } from './AgentAvatar'
 
 interface Props {
   agents: Agent[]
+  onAgentClick: (agentId: string) => void
 }
 
-export function Office({ agents }: Props) {
+export function Office({ agents, onAgentClick }: Props) {
   const activeCount = agents.filter((a) => a.activeRun !== null).length
 
   return (
@@ -59,7 +60,7 @@ export function Office({ agents }: Props) {
             <div className="relative z-10 flex flex-wrap justify-center gap-6">
               {agents.map((agent, i) => (
                 <div key={agent.id} className="relative">
-                  <AgentAvatar agent={agent} index={i} />
+                  <AgentAvatar agent={agent} index={i} onClick={() => onAgentClick(agent.id)} />
                 </div>
               ))}
             </div>
