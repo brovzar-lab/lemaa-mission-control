@@ -1,17 +1,24 @@
 import { useAgents } from './useAgents'
+import { usePipelineIssues } from './useIssues'
+import { useActivity } from './useActivity'
 import { Office } from './Office'
+import { PipelinePanel } from './components/PipelinePanel'
+import { ActivityFeed } from './components/ActivityFeed'
+import { RefreshCountdownRing } from './components/RefreshCountdownRing'
 import { isDemoMode, POLL_INTERVAL_MS } from './config'
 
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <div className="pixel-text text-cyan-400 text-lg animate-pulse">BOOTING MISSION CONTROL...</div>
+      <div className="pixel-text" style={{ color: 'var(--active)', fontSize: '0.75rem' }}>
+        BOOTING MISSION CONTROL...
+      </div>
       <div className="flex gap-1">
         {[0, 1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="w-2 h-2 bg-cyan-400 animate-bounce"
-            style={{ animationDelay: `${i * 0.1}s` }}
+            className="w-2 h-2 rounded-sm animate-bounce"
+            style={{ backgroundColor: 'var(--active)', animationDelay: `${i * 0.1}s` }}
           />
         ))}
       </div>
@@ -22,74 +29,148 @@ function LoadingScreen() {
 function ErrorScreen({ message }: { message: string }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2">
-      <div className="pixel-text text-red-400 text-base">CONNECTION FAILED</div>
-      <div className="pixel-text text-gray-500 text-xs max-w-sm text-center">{message}</div>
+      <div className="pixel-text" style={{ color: 'var(--error)', fontSize: '0.75rem' }}>
+        CONNECTION FAILED
+      </div>
+      <div className="pixel-text max-w-sm text-center" style={{ color: '#64748b', fontSize: '0.65rem' }}>
+        {message}
+      </div>
     </div>
   )
 }
 
 export default function App() {
-  const { data: agents, isLoading, isError, error, dataUpdatedAt } = useAgents()
+  const {
+    data: agents,
+    isLoading,
+    isError,
+    error,
+    dataUpdatedAt,
+    isFetching: isAgentsFetching,
+  } = useAgents()
 
-  const lastUpdate = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : '--:--:--'
+  const {
+    data: pipelineIssues,
+    isFetching: isPipelineFetching,
+  } = usePipelineIssues()
+
+  const {
+    data: activityEvents,
+    isFetching: isActivityFetching,
+  } = useActivity()
+
+  const isRefreshing = isAgentsFetching || isPipelineFetching || isActivityFetching
+  const lastUpdated = dataUpdatedAt ?? Date.now()
 
   return (
-    <div className="min-h-screen relative scanlines">
-      {/* CRT header bar */}
+    <div
+      className="min-h-screen relative scanlines flex flex-col"
+      style={{ backgroundColor: 'var(--bg-void)' }}
+    >
+      {/* Header */}
       <header
-        className="w-full px-6 py-3 flex items-center justify-between"
-        style={{ borderBottom: '1px solid #1e293b', backgroundColor: '#0a0a16' }}
+        className="w-full px-5 py-2.5 flex items-center justify-between flex-shrink-0"
+        style={{
+          background: 'linear-gradient(180deg, rgba(13,17,23,0.98) 0%, rgba(8,11,20,0.95) 100%)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(8px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+        }}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="pixel-text text-green-400" style={{ fontSize: '0.75rem' }}>
-            PAPERCLIP MISSION CONTROL
+        {/* Left: logo + title */}
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ backgroundColor: 'var(--active)', boxShadow: '0 0 6px var(--active)' }}
+          />
+          <span
+            className="pixel-text"
+            style={{ color: 'var(--active)', fontSize: '0.7rem' }}
+          >
+            Paperclip Mission Control
           </span>
-        </div>
-
-        <div className="flex items-center gap-4">
           {isDemoMode && (
             <span
               className="pixel-text px-2 py-0.5 rounded"
               style={{
-                fontSize: '0.6rem',
-                backgroundColor: '#7c3aed22',
-                border: '1px solid #7c3aed',
+                fontSize: '0.55rem',
+                backgroundColor: 'rgba(124,58,237,0.15)',
+                border: '1px solid rgba(124,58,237,0.4)',
                 color: '#a78bfa',
               }}
             >
-              DEMO MODE
+              Demo
             </span>
           )}
-          <span className="pixel-text text-gray-600" style={{ fontSize: '0.6rem' }}>
-            LAST SYNC: {lastUpdate}
-          </span>
-          <span className="pixel-text text-gray-600" style={{ fontSize: '0.6rem' }}>
-            POLL: {POLL_INTERVAL_MS / 1000}s
-          </span>
+        </div>
+
+        {/* Right: last sync + refresh ring */}
+        <div className="flex items-center gap-3">
+          {dataUpdatedAt > 0 && (
+            <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#334155' }}>
+              Last sync {new Date(dataUpdatedAt).toLocaleTimeString()}
+            </span>
+          )}
+          <RefreshCountdownRing
+            intervalMs={POLL_INTERVAL_MS}
+            lastUpdatedAt={lastUpdated}
+            isRefreshing={isRefreshing}
+          />
         </div>
       </header>
 
       {/* Main content */}
-      <main className="px-4 pb-8">
+      <main className="flex-1 px-4 pb-6 pt-4 flex flex-col gap-4 max-w-screen-2xl w-full mx-auto">
         {isLoading && <LoadingScreen />}
         {isError && (
           <ErrorScreen
             message={error instanceof Error ? error.message : 'Unknown error'}
           />
         )}
-        {agents && <Office agents={agents} />}
+
+        {agents && (
+          <>
+            {/* Agent office grid */}
+            <div className={isRefreshing ? 'refresh-shimmer rounded-xl' : ''}>
+              <Office agents={agents} />
+            </div>
+
+            {/* Pipeline + Activity two-panel row */}
+            <div
+              className="grid gap-4"
+              style={{
+                gridTemplateColumns: 'minmax(0, 55fr) minmax(0, 45fr)',
+                minHeight: '380px',
+              }}
+            >
+              <PipelinePanel
+                issues={pipelineIssues ?? []}
+                agents={agents}
+                isRefreshing={isPipelineFetching}
+              />
+              <ActivityFeed
+                events={activityEvents ?? []}
+                isRefreshing={isActivityFetching}
+              />
+            </div>
+          </>
+        )}
       </main>
 
-      {/* CRT scanline footer */}
+      {/* Footer */}
       <footer
-        className="fixed bottom-0 w-full px-6 py-1 flex items-center justify-between"
-        style={{ borderTop: '1px solid #1e293b', backgroundColor: '#0a0a16' }}
+        className="flex-shrink-0 w-full px-5 py-1.5 flex items-center justify-between"
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.04)',
+          backgroundColor: 'rgba(8,11,20,0.8)',
+        }}
       >
-        <span className="pixel-text text-gray-700" style={{ fontSize: '0.5rem' }}>
-          BUILT WITH PAPERCLIP AGENTS
+        <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#1e293b' }}>
+          Built with Paperclip Agents
         </span>
-        <span className="pixel-text text-gray-700" style={{ fontSize: '0.5rem' }}>
+        <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#1e293b' }}>
           {new Date().getFullYear()} LEMAA
         </span>
       </footer>
