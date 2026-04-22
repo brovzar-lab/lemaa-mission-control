@@ -33,15 +33,23 @@ function formatRunDuration(startedAt: string): string {
 interface Props {
   agent: Agent
   index: number
+  onClick?: () => void
 }
 
-export function AgentAvatar({ agent, index }: Props) {
+export function AgentAvatar({ agent, index, onClick }: Props) {
   const isActive = agent.activeRun !== null
   const color = getColor(agent.role)
   const initials = getInitials(agent.name)
 
   return (
-    <div className="flex flex-col items-center gap-1 group" style={{ animationDelay: `${index * 0.15}s` }}>
+    <div
+      className="flex flex-col items-center gap-1 group"
+      style={{ animationDelay: `${index * 0.15}s`, cursor: onClick ? 'pointer' : 'default' }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick() } : undefined}
+    >
       {/* Desk platform */}
       <div
         className="relative w-16 h-3 rounded-sm opacity-60"
@@ -50,7 +58,7 @@ export function AgentAvatar({ agent, index }: Props) {
 
       {/* Avatar with animation */}
       <div
-        className={`relative -mt-2 w-12 h-12 rounded-sm flex items-center justify-center text-sm font-bold select-none cursor-default ${
+        className={`relative -mt-2 w-12 h-12 rounded-sm flex items-center justify-center text-sm font-bold select-none ${
           isActive ? 'animate-bounce' : 'animate-float'
         }`}
         style={{

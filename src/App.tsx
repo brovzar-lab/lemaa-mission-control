@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAgents } from './useAgents'
 import { usePipelineIssues } from './useIssues'
@@ -9,6 +9,9 @@ import { ActivityFeed } from './components/ActivityFeed'
 import { RefreshCountdownRing } from './components/RefreshCountdownRing'
 import { StatsBar } from './components/StatsBar'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
+import { AgentDetailDrawer } from './components/AgentDetailDrawer'
+import { CommandPalette } from './components/CommandPalette'
+import { HealthOrb } from './components/HealthOrb'
 import { isDemoMode, POLL_INTERVAL_MS, COMPANIES, getSelectedCompany, saveSelectedCompany } from './config'
 import type { Company } from './config'
 
@@ -81,6 +84,8 @@ function CompanySwitcher({
 export default function App() {
   const queryClient = useQueryClient()
   const [selectedCompany, setSelectedCompany] = useState<Company>(getSelectedCompany)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   const {
     data: agents,
@@ -94,6 +99,7 @@ export default function App() {
   const {
     data: pipelineIssues,
     isFetching: isPipelineFetching,
+    refetch: refetchPipeline,
   } = usePipelineIssues(selectedCompany.id)
 
   const {
@@ -104,9 +110,37 @@ export default function App() {
   const isRefreshing = isAgentsFetching || isPipelineFetching || isActivityFetching
   const lastUpdated = dataUpdatedAt ?? Date.now()
 
+  const selectedAgent = agents?.find((a) => a.id === selectedAgentId) ?? null
+
+  const handleCloseCommandPalette = useCallback(() => setCommandPaletteOpen(false), [])
+  const handleCloseDrawer = useCallback(() => setSelectedAgentId(null), [])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen((v) => !v)
+        return
+      }
+      if (!commandPaletteOpen && e.key === 'r') {
+        e.preventDefault()
+        queryClient.invalidateQueries({ queryKey: ['agents', selectedCompany.id] })
+        refetchPipeline()
+        return
+      }
+      if (!commandPaletteOpen && e.key === 'f') {
+        e.preventDefault()
+        setCommandPaletteOpen(true)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [commandPaletteOpen, queryClient, selectedCompany.id, refetchPipeline])
+
   function handleCompanyChange(company: Company) {
     saveSelectedCompany(company)
     setSelectedCompany(company)
+    setSelectedAgentId(null)
     queryClient.removeQueries({ queryKey: ['agents', selectedCompany.id] })
     queryClient.removeQueries({ queryKey: ['pipeline-issues', selectedCompany.id] })
     queryClient.removeQueries({ queryKey: ['activity', selectedCompany.id] })
@@ -170,6 +204,11 @@ export default function App() {
           </span>
         </div>
 
+        {/* Center: global health orb */}
+        <div className="absolute left-1/2" style={{ transform: 'translateX(-50%)' }}>
+          {agents && <HealthOrb agents={agents} />}
+        </div>
+
         {/* Right: company switcher + last sync + refresh ring */}
         <div className="flex items-center gap-4">
           <CompanySwitcher selected={selectedCompany} onChange={handleCompanyChange} />
@@ -206,7 +245,7 @@ export default function App() {
 
             {/* Agent office grid */}
             <div className={isRefreshing ? 'refresh-shimmer rounded-xl' : ''}>
-              <Office agents={agents} />
+              <Office agents={agents} onAgentClick={(id) => setSelectedAgentId(id)} />
             </div>
 
             {/* Pipeline + Activity two-panel row */}
@@ -248,10 +287,53 @@ export default function App() {
         <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#1e293b' }}>
           Built with Paperclip Agents
         </span>
+        {/* Keyboard shortcut strip */}
+        <div className="flex items-center gap-3">
+          {[
+            { key: 'R', label: 'Refresh' },
+            { key: 'F', label: 'Filter' },
+            { key: '⌘K', label: 'Command' },
+          ].map(({ key, label }) => (
+            <span key={key} className="pixel-text flex items-center gap-1" style={{ fontSize: '0.45rem', color: '#1e293b' }}>
+              <kbd
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '3px',
+                  padding: '1px 4px',
+                  fontFamily: 'inherit',
+                  fontSize: '0.45rem',
+                }}
+              >
+                {key}
+              </kbd>
+              {label}
+            </span>
+          ))}
+        </div>
         <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#1e293b' }}>
           {new Date().getFullYear()} LEMAA
         </span>
       </footer>
+
+      {/* Agent detail drawer */}
+      <AgentDetailDrawer
+        agent={selectedAgent}
+        activityEvents={activityEvents ?? []}
+        onClose={handleCloseDrawer}
+      />
+
+      {/* Command palette */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        agents={agents ?? []}
+        pipelineIssues={pipelineIssues ?? []}
+        onClose={handleCloseCommandPalette}
+        onSelectAgent={(id) => {
+          setSelectedAgentId(id)
+          setCommandPaletteOpen(false)
+        }}
+      />
     </div>
   )
 }
