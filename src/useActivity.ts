@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { API_URL, API_KEY, COMPANY_ID, POLL_INTERVAL_MS, isDemoMode } from './config'
+import { POLL_INTERVAL_MS, isDemoMode } from './config'
+import { apiUrl, apiHeaders } from './api'
 import { DEMO_ACTIVITY } from './demoData'
 import type { ActivityEvent, Issue } from './types'
 
@@ -17,10 +18,10 @@ function issueToEvent(issue: Issue): ActivityEvent {
   }
 }
 
-async function fetchActivity(): Promise<ActivityEvent[]> {
+async function fetchActivity(companyId: string): Promise<ActivityEvent[]> {
   const res = await fetch(
-    `${API_URL}/api/companies/${COMPANY_ID}/issues?status=done,blocked,in_progress`,
-    { headers: { Authorization: `Bearer ${API_KEY}` } },
+    apiUrl(`/api/companies/${companyId}/issues?status=done,blocked,in_progress`),
+    { headers: apiHeaders() },
   )
   if (!res.ok) throw new Error(`Failed to fetch activity: ${res.status}`)
   const issues: Issue[] = await res.json()
@@ -30,11 +31,12 @@ async function fetchActivity(): Promise<ActivityEvent[]> {
     .map(issueToEvent)
 }
 
-export function useActivity() {
+export function useActivity(companyId: string) {
   return useQuery<ActivityEvent[]>({
-    queryKey: ['activity'],
-    queryFn: isDemoMode ? () => Promise.resolve(DEMO_ACTIVITY) : fetchActivity,
+    queryKey: ['activity', companyId],
+    queryFn: isDemoMode ? () => Promise.resolve(DEMO_ACTIVITY) : () => fetchActivity(companyId),
     refetchInterval: POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
+    enabled: !!companyId,
   })
 }

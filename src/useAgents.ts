@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { API_URL, API_KEY, COMPANY_ID, POLL_INTERVAL_MS, isDemoMode } from './config'
+import { POLL_INTERVAL_MS, isDemoMode } from './config'
+import { apiUrl, apiHeaders } from './api'
 import { DEMO_AGENTS } from './demoData'
 import type { Agent } from './types'
 
@@ -11,14 +12,10 @@ interface IssueRef {
   activeRun: { id: string; status: string; startedAt: string } | null
 }
 
-async function fetchAgents(): Promise<Agent[]> {
+async function fetchAgents(companyId: string): Promise<Agent[]> {
   const [agentsRes, issuesRes] = await Promise.all([
-    fetch(`${API_URL}/api/companies/${COMPANY_ID}/agents`, {
-      headers: { Authorization: `Bearer ${API_KEY}` },
-    }),
-    fetch(`${API_URL}/api/companies/${COMPANY_ID}/issues?status=in_progress`, {
-      headers: { Authorization: `Bearer ${API_KEY}` },
-    }),
+    fetch(apiUrl(`/api/companies/${companyId}/agents`), { headers: apiHeaders() }),
+    fetch(apiUrl(`/api/companies/${companyId}/issues?status=in_progress`), { headers: apiHeaders() }),
   ])
   if (!agentsRes.ok) throw new Error(`Failed to fetch agents: ${agentsRes.status}`)
   if (!issuesRes.ok) throw new Error(`Failed to fetch issues: ${issuesRes.status}`)
@@ -41,11 +38,12 @@ async function fetchAgents(): Promise<Agent[]> {
   })
 }
 
-export function useAgents() {
+export function useAgents(companyId: string) {
   return useQuery<Agent[]>({
-    queryKey: ['agents'],
-    queryFn: isDemoMode ? () => Promise.resolve(DEMO_AGENTS) : fetchAgents,
+    queryKey: ['agents', companyId],
+    queryFn: isDemoMode ? () => Promise.resolve(DEMO_AGENTS) : () => fetchAgents(companyId),
     refetchInterval: POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
+    enabled: !!companyId,
   })
 }

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAgents } from './useAgents'
 import { usePipelineIssues } from './useIssues'
 import { useActivity } from './useActivity'
@@ -7,7 +9,8 @@ import { ActivityFeed } from './components/ActivityFeed'
 import { RefreshCountdownRing } from './components/RefreshCountdownRing'
 import { StatsBar } from './components/StatsBar'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
-import { isDemoMode, POLL_INTERVAL_MS } from './config'
+import { isDemoMode, POLL_INTERVAL_MS, COMPANIES, getSelectedCompany, saveSelectedCompany } from './config'
+import type { Company } from './config'
 
 function LoadingScreen() {
   return (
@@ -41,7 +44,44 @@ function ErrorScreen({ message }: { message: string }) {
   )
 }
 
+function CompanySwitcher({
+  selected,
+  onChange,
+}: {
+  selected: Company
+  onChange: (c: Company) => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {COMPANIES.map((company) => (
+        <button
+          key={company.id}
+          onClick={() => onChange(company)}
+          className="pixel-text px-2.5 py-1 rounded transition-all"
+          style={{
+            fontSize: '0.55rem',
+            backgroundColor: selected.id === company.id
+              ? 'rgba(99,102,241,0.25)'
+              : 'rgba(255,255,255,0.04)',
+            border: selected.id === company.id
+              ? '1px solid rgba(99,102,241,0.6)'
+              : '1px solid rgba(255,255,255,0.08)',
+            color: selected.id === company.id ? '#a5b4fc' : '#475569',
+            cursor: 'pointer',
+            letterSpacing: '0.08em',
+          }}
+        >
+          {company.short}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function App() {
+  const queryClient = useQueryClient()
+  const [selectedCompany, setSelectedCompany] = useState<Company>(getSelectedCompany)
+
   const {
     data: agents,
     isLoading,
@@ -49,20 +89,28 @@ export default function App() {
     error,
     dataUpdatedAt,
     isFetching: isAgentsFetching,
-  } = useAgents()
+  } = useAgents(selectedCompany.id)
 
   const {
     data: pipelineIssues,
     isFetching: isPipelineFetching,
-  } = usePipelineIssues()
+  } = usePipelineIssues(selectedCompany.id)
 
   const {
     data: activityEvents,
     isFetching: isActivityFetching,
-  } = useActivity()
+  } = useActivity(selectedCompany.id)
 
   const isRefreshing = isAgentsFetching || isPipelineFetching || isActivityFetching
   const lastUpdated = dataUpdatedAt ?? Date.now()
+
+  function handleCompanyChange(company: Company) {
+    saveSelectedCompany(company)
+    setSelectedCompany(company)
+    queryClient.removeQueries({ queryKey: ['agents', selectedCompany.id] })
+    queryClient.removeQueries({ queryKey: ['pipeline-issues', selectedCompany.id] })
+    queryClient.removeQueries({ queryKey: ['activity', selectedCompany.id] })
+  }
 
   return (
     <div
@@ -81,8 +129,8 @@ export default function App() {
           zIndex: 20,
         }}
       >
-        {/* Left: logo + title */}
-        <div className="flex items-center gap-2.5">
+        {/* Left: logo + title + company switcher */}
+        <div className="flex items-center gap-3">
           <div
             className="w-2 h-2 rounded-full animate-pulse"
             style={{ backgroundColor: 'var(--active)', boxShadow: '0 0 6px var(--active)' }}
@@ -106,10 +154,25 @@ export default function App() {
               Demo
             </span>
           )}
+          <div
+            style={{
+              width: '1px',
+              height: '14px',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              margin: '0 4px',
+            }}
+          />
+          <span
+            className="pixel-text"
+            style={{ fontSize: '0.6rem', color: '#64748b' }}
+          >
+            {selectedCompany.name}
+          </span>
         </div>
 
-        {/* Right: last sync + refresh ring */}
-        <div className="flex items-center gap-3">
+        {/* Right: company switcher + last sync + refresh ring */}
+        <div className="flex items-center gap-4">
+          <CompanySwitcher selected={selectedCompany} onChange={handleCompanyChange} />
           {dataUpdatedAt > 0 && (
             <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#334155' }}>
               Last sync {new Date(dataUpdatedAt).toLocaleTimeString()}
