@@ -5,6 +5,8 @@ import { Office } from './Office'
 import { PipelinePanel } from './components/PipelinePanel'
 import { ActivityFeed } from './components/ActivityFeed'
 import { RefreshCountdownRing } from './components/RefreshCountdownRing'
+import { StatsBar } from './components/StatsBar'
+import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { isDemoMode, POLL_INTERVAL_MS } from './config'
 
 function LoadingScreen() {
@@ -132,6 +134,13 @@ export default function App() {
 
         {agents && (
           <>
+            {/* KPI Stats Bar */}
+            <StatsBar
+              agents={agents}
+              pipelineIssues={pipelineIssues ?? []}
+              activityEvents={activityEvents ?? []}
+            />
+
             {/* Agent office grid */}
             <div className={isRefreshing ? 'refresh-shimmer rounded-xl' : ''}>
               <Office agents={agents} />
@@ -155,6 +164,12 @@ export default function App() {
                 isRefreshing={isActivityFetching}
               />
             </div>
+
+            {/* Activity Heatmap */}
+            <ActivityHeatmap
+              agents={agents}
+              events={activityEvents ?? []}
+            />
           </>
         )}
       </main>
