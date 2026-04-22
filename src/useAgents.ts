@@ -8,6 +8,7 @@ interface IssueRef {
   identifier: string
   title: string
   assigneeAgentId: string | null
+  activeRun: { id: string; status: string; startedAt: string } | null
 }
 
 async function fetchAgents(): Promise<Agent[]> {
@@ -35,7 +36,7 @@ async function fetchAgents(): Promise<Agent[]> {
   return agents.map((agent) => {
     const issue = issueByAgentId.get(agent.id)
     return issue
-      ? { ...agent, currentIssue: { identifier: issue.identifier, title: issue.title } }
+      ? { ...agent, currentIssue: { identifier: issue.identifier, title: issue.title }, activeRun: issue.activeRun }
       : agent
   })
 }
