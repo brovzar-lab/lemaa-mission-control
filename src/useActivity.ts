@@ -23,7 +23,10 @@ async function fetchActivity(companyId: string): Promise<ActivityEvent[]> {
     apiUrl(`/api/companies/${companyId}/issues?status=done,blocked,in_progress`),
     { headers: apiHeaders() },
   )
-  if (!res.ok) throw new Error(`Failed to fetch activity: ${res.status}`)
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) return DEMO_ACTIVITY
+    throw new Error(`Failed to fetch activity: ${res.status}`)
+  }
   const issues: Issue[] = await res.json()
   return issues
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())

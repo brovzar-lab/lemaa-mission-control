@@ -14,7 +14,7 @@ export const DEMO_AGENTS: Agent[] = [
       startedAt: new Date(Date.now() - 120000).toISOString(),
     },
     urlKey: 'ceo',
-    currentIssue: { identifier: 'APPU-101', title: 'Q2 product strategy review' },
+    currentIssue: { identifier: 'APPU-101', title: 'Q2 product strategy review', status: 'in_progress' },
   },
   {
     id: 'demo-cto',
@@ -39,7 +39,7 @@ export const DEMO_AGENTS: Agent[] = [
       startedAt: new Date(Date.now() - 45000).toISOString(),
     },
     urlKey: 'lead-app-engineer',
-    currentIssue: { identifier: 'APPU-149', title: 'Mission Control Phase 2 enhancements' },
+    currentIssue: { identifier: 'APPU-149', title: 'Mission Control Phase 2 enhancements', status: 'in_progress' },
   },
   {
     id: 'demo-designer',
@@ -64,7 +64,7 @@ export const DEMO_AGENTS: Agent[] = [
       startedAt: new Date(Date.now() - 200000).toISOString(),
     },
     urlKey: 'senior-web-engineer',
-    currentIssue: { identifier: 'APPU-148', title: 'Mission Control Phase 1 — CSS tokens' },
+    currentIssue: { identifier: 'APPU-148', title: 'Mission Control Phase 1 — CSS tokens', status: 'blocked' },
   },
   {
     id: 'demo-web-2',
@@ -79,7 +79,7 @@ export const DEMO_AGENTS: Agent[] = [
       startedAt: new Date(Date.now() - 5000).toISOString(),
     },
     urlKey: 'senior-web-engineer-ii',
-    currentIssue: { identifier: 'APPU-149', title: 'Mission Control Phase 2 enhancements' },
+    currentIssue: { identifier: 'APPU-149', title: 'Mission Control Phase 2 enhancements', status: 'in_progress' },
   },
   {
     id: 'demo-mobile-ios',
@@ -188,6 +188,33 @@ export const DEMO_PIPELINE_ISSUES: Issue[] = [
     assigneeAgentId: 'demo-mobile-android',
     updatedAt: new Date(Date.now() - 900000).toISOString(),
     startedAt: new Date(Date.now() - 43200000).toISOString(),
+  },
+  {
+    id: 'demo-todo-1',
+    identifier: 'APPU-154',
+    title: 'Mission Control V3 — deep links, hover states, incident mode',
+    status: 'todo',
+    priority: 'high',
+    assigneeAgentId: 'demo-lead-app',
+    updatedAt: new Date(Date.now() - 600000).toISOString(),
+  },
+  {
+    id: 'demo-todo-2',
+    identifier: 'APPU-155',
+    title: 'Mobile responsive layout for Mission Control dashboard',
+    status: 'todo',
+    priority: 'medium',
+    assigneeAgentId: 'demo-web-1',
+    updatedAt: new Date(Date.now() - 1200000).toISOString(),
+  },
+  {
+    id: 'demo-todo-3',
+    identifier: 'APPU-156',
+    title: 'Agent workload bar chart — NF4 implementation',
+    status: 'todo',
+    priority: 'low',
+    assigneeAgentId: 'demo-web-2',
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
   },
 ]
 

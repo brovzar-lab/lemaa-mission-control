@@ -8,6 +8,7 @@ interface IssueRef {
   id: string
   identifier: string
   title: string
+  status: string
   assigneeAgentId: string | null
   activeRun: { id: string; status: string; startedAt: string } | null
 }
@@ -15,9 +16,12 @@ interface IssueRef {
 async function fetchAgents(companyId: string): Promise<Agent[]> {
   const [agentsRes, issuesRes] = await Promise.all([
     fetch(apiUrl(`/api/companies/${companyId}/agents`), { headers: apiHeaders() }),
-    fetch(apiUrl(`/api/companies/${companyId}/issues?status=in_progress`), { headers: apiHeaders() }),
+    fetch(apiUrl(`/api/companies/${companyId}/issues?status=in_progress,blocked`), { headers: apiHeaders() }),
   ])
-  if (!agentsRes.ok) throw new Error(`Failed to fetch agents: ${agentsRes.status}`)
+  if (!agentsRes.ok) {
+    if (agentsRes.status === 401 || agentsRes.status === 403) return DEMO_AGENTS
+    throw new Error(`Failed to fetch agents: ${agentsRes.status}`)
+  }
   if (!issuesRes.ok) throw new Error(`Failed to fetch issues: ${issuesRes.status}`)
 
   const agents = (await agentsRes.json()) as Agent[]
@@ -33,7 +37,11 @@ async function fetchAgents(companyId: string): Promise<Agent[]> {
   return agents.map((agent) => {
     const issue = issueByAgentId.get(agent.id)
     return issue
-      ? { ...agent, currentIssue: { identifier: issue.identifier, title: issue.title }, activeRun: issue.activeRun }
+      ? {
+          ...agent,
+          currentIssue: { identifier: issue.identifier, title: issue.title, status: issue.status ?? 'in_progress' },
+          activeRun: issue.activeRun,
+        }
       : agent
   })
 }

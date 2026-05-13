@@ -2,12 +2,13 @@ import { useState } from 'react'
 import type { Issue, Agent } from '../types'
 import { TaskRow } from './TaskRow'
 
-type Tab = 'in_progress' | 'blocked' | 'in_review'
+type Tab = 'in_progress' | 'blocked' | 'in_review' | 'todo'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'in_progress', label: 'In Progress' },
   { id: 'blocked', label: 'Blocked' },
   { id: 'in_review', label: 'In Review' },
+  { id: 'todo', label: 'Queued' },
 ]
 
 interface Props {
@@ -23,6 +24,7 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
     in_progress: issues.filter((i) => i.status === 'in_progress').length,
     blocked: issues.filter((i) => i.status === 'blocked').length,
     in_review: issues.filter((i) => i.status === 'in_review').length,
+    todo: issues.filter((i) => i.status === 'todo').length,
   }
 
   const visible = issues.filter((i) => i.status === activeTab)
@@ -45,7 +47,7 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
             className="mono"
             style={{ fontSize: '0.6rem', color: '#475569' }}
           >
-            {issues.length} tasks
+            {issues.filter((i) => i.status !== 'todo').length} active · {counts.todo} queued
           </span>
         </div>
 
@@ -56,6 +58,7 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
             const count = counts[tab.id]
             const isBlockedTab = tab.id === 'blocked'
             const hasBlockers = isBlockedTab && count > 0
+            const isQueuedTab = tab.id === 'todo'
 
             return (
               <button
@@ -68,7 +71,7 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
                     : 'transparent',
                   color: isActive ? '#e2e8f0' : '#64748b',
                   borderBottom: isActive
-                    ? '2px solid var(--active)'
+                    ? `2px solid ${isQueuedTab ? '#818cf8' : 'var(--active)'}`
                     : '2px solid transparent',
                   fontSize: '0.75rem',
                   marginBottom: '-1px',
@@ -83,11 +86,15 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
                     backgroundColor: isActive
                       ? hasBlockers
                         ? 'rgba(245,158,11,0.2)'
+                        : isQueuedTab
+                        ? 'rgba(129,140,248,0.15)'
                         : 'rgba(34,211,238,0.15)'
                       : 'rgba(255,255,255,0.05)',
                     color: isActive
                       ? hasBlockers
                         ? '#f59e0b'
+                        : isQueuedTab
+                        ? '#818cf8'
                         : '#22d3ee'
                       : '#475569',
                     fontSize: '0.6rem',
@@ -133,10 +140,9 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
                 rx="4"
                 stroke="currentColor"
                 strokeWidth="1.5"
-                strokeDasharray="4 3"
               />
               <path
-                d="M11 16h10M16 11v10"
+                d="M11 16h10"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"

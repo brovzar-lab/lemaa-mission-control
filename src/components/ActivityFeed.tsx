@@ -264,12 +264,17 @@ export function ActivityFeed({ events, isRefreshing }: Props) {
                             {evt.type === 'assigned' && 'started'}
                             {evt.type === 'error' && 'errored on'}
                           </span>
-                          <span
+                          <a
+                            href={`/${evt.issueIdentifier.split('-')[0]}/issues/${evt.issueIdentifier}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="mono ml-1"
-                            style={{ fontSize: '0.65rem', color: '#64748b' }}
+                            style={{ fontSize: '0.65rem', color: '#64748b', textDecoration: 'none' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.textDecoration = 'underline' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.textDecoration = 'none' }}
                           >
                             {evt.issueIdentifier}
-                          </span>
+                          </a>
                           <div
                             className="truncate mt-0.5"
                             style={{ fontSize: '0.7rem', color: '#475569' }}

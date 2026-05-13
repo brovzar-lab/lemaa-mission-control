@@ -25,7 +25,10 @@ export function saveSelectedCompany(company: Company): void {
   localStorage.setItem(COMPANY_KEY, JSON.stringify(company))
 }
 
-// Demo mode: only in local dev without a dev API URL configured
-export const isDemoMode = import.meta.env.DEV && !import.meta.env.VITE_PAPERCLIP_API_URL
+// Demo mode: local dev without API URL, OR ?demo=true query param, OR API error fallback
+const _searchParams = new URLSearchParams(window.location.search)
+export const isDemoMode =
+  _searchParams.get('demo') === 'true' ||
+  (import.meta.env.DEV && !import.meta.env.VITE_PAPERCLIP_API_URL)
 
 export const POLL_INTERVAL_MS = Number(import.meta.env.VITE_POLL_INTERVAL_MS ?? 30000)

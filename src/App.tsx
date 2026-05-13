@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAgents } from './useAgents'
 import { usePipelineIssues } from './useIssues'
@@ -60,6 +60,7 @@ function CompanySwitcher({
         <button
           key={company.id}
           onClick={() => onChange(company)}
+          title={company.name}
           className="pixel-text px-2.5 py-1 rounded transition-all"
           style={{
             fontSize: '0.55rem',
@@ -111,6 +112,20 @@ export default function App() {
   const lastUpdated = dataUpdatedAt ?? Date.now()
 
   const selectedAgent = agents?.find((a) => a.id === selectedAgentId) ?? null
+
+  const companyPrefix = useMemo(() => {
+    const sample = pipelineIssues?.[0] ?? agents?.find((a) => a.currentIssue)?.currentIssue
+    if (sample?.identifier) return sample.identifier.split('-')[0]
+    return selectedCompany.short
+  }, [pipelineIssues, agents, selectedCompany.short])
+
+  const incidentMode = useMemo(() => {
+    const issues = pipelineIssues ?? []
+    const active = issues.filter((i) => i.status !== 'todo')
+    if (active.length === 0) return false
+    const blocked = active.filter((i) => i.status === 'blocked').length
+    return blocked / active.length > 0.4
+  }, [pipelineIssues])
 
   const handleCloseCommandPalette = useCallback(() => setCommandPaletteOpen(false), [])
   const handleCloseDrawer = useCallback(() => setSelectedAgentId(null), [])
@@ -206,14 +221,14 @@ export default function App() {
 
         {/* Center: global health orb */}
         <div className="absolute left-1/2" style={{ transform: 'translateX(-50%)' }}>
-          {agents && <HealthOrb agents={agents} />}
+          {agents && <HealthOrb issues={pipelineIssues?.filter((i) => i.status !== 'todo') ?? []} />}
         </div>
 
         {/* Right: company switcher + last sync + refresh ring */}
         <div className="flex items-center gap-4">
           <CompanySwitcher selected={selectedCompany} onChange={handleCompanyChange} />
           {dataUpdatedAt > 0 && (
-            <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#334155' }}>
+            <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#64748b' }}>
               Last sync {new Date(dataUpdatedAt).toLocaleTimeString()}
             </span>
           )}
@@ -234,6 +249,22 @@ export default function App() {
           />
         )}
 
+        {/* NF1: Incident mode banner */}
+        {incidentMode && (
+          <div
+            className="w-full px-4 py-2 flex items-center gap-3 rounded-lg animate-pulse"
+            style={{
+              backgroundColor: 'rgba(248,113,113,0.12)',
+              border: '1px solid rgba(248,113,113,0.4)',
+            }}
+          >
+            <span style={{ color: '#f87171', fontSize: '1rem' }}>⚠</span>
+            <span className="pixel-text" style={{ fontSize: '0.6rem', color: '#f87171' }}>
+              INCIDENT MODE — &gt;40% of active tasks are blocked. Blocked tasks have been escalated to the top of the pipeline.
+            </span>
+          </div>
+        )}
+
         {agents && (
           <>
             {/* KPI Stats Bar */}
@@ -248,16 +279,12 @@ export default function App() {
               <Office agents={agents} onAgentClick={(id) => setSelectedAgentId(id)} />
             </div>
 
-            {/* Pipeline + Activity two-panel row */}
-            <div
-              className="grid gap-4"
-              style={{
-                gridTemplateColumns: 'minmax(0, 55fr) minmax(0, 45fr)',
-                minHeight: '380px',
-              }}
-            >
+            {/* NF2: Pipeline + Activity — two-column on sm+, single-column on mobile */}
+            <div className="pipeline-activity-grid">
               <PipelinePanel
-                issues={pipelineIssues ?? []}
+                issues={incidentMode
+                  ? [...(pipelineIssues ?? []).filter((i) => i.status === 'blocked'), ...(pipelineIssues ?? []).filter((i) => i.status !== 'blocked')]
+                  : (pipelineIssues ?? [])}
                 agents={agents}
                 isRefreshing={isPipelineFetching}
               />
@@ -284,25 +311,26 @@ export default function App() {
           backgroundColor: 'rgba(8,11,20,0.8)',
         }}
       >
-        <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#1e293b' }}>
+        <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#475569' }}>
           Built with Paperclip Agents
         </span>
         {/* Keyboard shortcut strip */}
         <div className="flex items-center gap-3">
           {[
             { key: 'R', label: 'Refresh' },
-            { key: 'F', label: 'Filter' },
+            { key: 'F', label: 'Search' },
             { key: '⌘K', label: 'Command' },
           ].map(({ key, label }) => (
-            <span key={key} className="pixel-text flex items-center gap-1" style={{ fontSize: '0.45rem', color: '#1e293b' }}>
+            <span key={key} className="pixel-text flex items-center gap-1" style={{ fontSize: '0.55rem', color: '#475569' }}>
               <kbd
                 style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: '3px',
                   padding: '1px 4px',
                   fontFamily: 'inherit',
-                  fontSize: '0.45rem',
+                  fontSize: '0.55rem',
+                  color: '#94a3b8',
                 }}
               >
                 {key}
@@ -311,8 +339,8 @@ export default function App() {
             </span>
           ))}
         </div>
-        <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#1e293b' }}>
-          {new Date().getFullYear()} LEMAA
+        <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#475569' }}>
+          {new Date().getFullYear()} Paperclip
         </span>
       </footer>
 
@@ -320,6 +348,7 @@ export default function App() {
       <AgentDetailDrawer
         agent={selectedAgent}
         activityEvents={activityEvents ?? []}
+        companyPrefix={companyPrefix}
         onClose={handleCloseDrawer}
       />
 

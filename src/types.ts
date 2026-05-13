@@ -13,7 +13,7 @@ export interface Agent {
   status: string
   activeRun: ActiveRun | null
   urlKey: string | null
-  currentIssue?: { identifier: string; title: string }
+  currentIssue?: { identifier: string; title: string; status: string }
 }
 
 export interface BlockerRef {

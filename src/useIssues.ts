@@ -6,10 +6,13 @@ import type { Issue } from './types'
 
 async function fetchPipelineIssues(companyId: string): Promise<Issue[]> {
   const res = await fetch(
-    apiUrl(`/api/companies/${companyId}/issues?status=in_progress,blocked,in_review`),
+    apiUrl(`/api/companies/${companyId}/issues?status=todo,in_progress,blocked,in_review`),
     { headers: apiHeaders() },
   )
-  if (!res.ok) throw new Error(`Failed to fetch pipeline issues: ${res.status}`)
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) return DEMO_PIPELINE_ISSUES
+    throw new Error(`Failed to fetch pipeline issues: ${res.status}`)
+  }
   return res.json()
 }
 

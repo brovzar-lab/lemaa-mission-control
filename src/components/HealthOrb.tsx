@@ -1,17 +1,13 @@
-import type { Agent } from '../types'
-
-const BLOCKED_ERROR_THRESHOLD = 0.3
+import type { Issue } from '../types'
 
 type HealthStatus = 'operational' | 'degraded' | 'critical'
 
-function computeHealth(agents: Agent[]): HealthStatus {
-  if (agents.length === 0) return 'operational'
-
-  const activeCount = agents.filter((a) => a.activeRun !== null).length
-  const idleCount = agents.length - activeCount
-
-  if (idleCount / agents.length > BLOCKED_ERROR_THRESHOLD) return 'degraded'
-  if (activeCount === 0) return 'critical'
+function computeHealth(issues: Issue[]): HealthStatus {
+  if (issues.length === 0) return 'operational'
+  const blockedCount = issues.filter((i) => i.status === 'blocked').length
+  const ratio = blockedCount / issues.length
+  if (ratio > 0.3) return 'critical'
+  if (ratio >= 0.1) return 'degraded'
   return 'operational'
 }
 
@@ -37,11 +33,11 @@ const HEALTH_CONFIG = {
 }
 
 interface Props {
-  agents: Agent[]
+  issues: Issue[]
 }
 
-export function HealthOrb({ agents }: Props) {
-  const status = computeHealth(agents)
+export function HealthOrb({ issues }: Props) {
+  const status = computeHealth(issues)
   const cfg = HEALTH_CONFIG[status]
 
   return (

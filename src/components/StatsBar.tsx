@@ -67,7 +67,7 @@ export function StatsBar({ agents, pipelineIssues, activityEvents }: Props) {
   const snapshots = snapshotsRef.current
 
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+    <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
       {KPI_CONFIGS.map((cfg) => {
         const value = currentValues[cfg.id]
         const past = snapshots[cfg.id]

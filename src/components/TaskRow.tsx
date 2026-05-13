@@ -86,12 +86,18 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
         {/* Title + identifier */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span
+            <a
+              href={`/${issue.identifier.split('-')[0]}/issues/${issue.identifier}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="mono flex-shrink-0"
-              style={{ fontSize: '0.65rem', color: '#64748b' }}
+              style={{ fontSize: '0.65rem', color: '#64748b', textDecoration: 'none' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.textDecoration = 'underline' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.textDecoration = 'none' }}
+              onClick={(e) => e.stopPropagation()}
             >
               {issue.identifier}
-            </span>
+            </a>
             {isBlocked && blockerCount > 0 && (
               <span
                 className="flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-medium animate-amber-pulse"
@@ -200,18 +206,27 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
               </div>
               <div className="flex flex-wrap gap-1">
                 {issue.blockedBy.map((b) => (
-                  <span
+                  <a
                     key={b.id}
+                    href={`/${b.identifier.split('-')[0]}/issues/${b.identifier}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="px-2 py-0.5 rounded"
                     style={{
                       backgroundColor: 'rgba(245,158,11,0.1)',
                       border: '1px solid rgba(245,158,11,0.25)',
                       color: '#f59e0b',
                       fontSize: '0.65rem',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.2)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
+                    onClick={(e) => e.stopPropagation()}
+                    title={b.title}
                   >
                     {b.identifier}
-                  </span>
+                  </a>
                 ))}
               </div>
             </div>
@@ -222,7 +237,7 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
             style={{ fontSize: '0.6rem', color: '#475569' }}
             title={isoTime}
           >
-            Updated {isoTime}
+            Updated {new Date(issue.updatedAt).toLocaleString()}
           </div>
         </div>
       )}

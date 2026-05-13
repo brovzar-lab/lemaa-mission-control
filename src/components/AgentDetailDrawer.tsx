@@ -59,10 +59,11 @@ const EVENT_COLORS: Record<string, string> = {
 interface Props {
   agent: Agent | null
   activityEvents: ActivityEvent[]
+  companyPrefix: string
   onClose: () => void
 }
 
-export function AgentDetailDrawer({ agent, activityEvents, onClose }: Props) {
+export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClose }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -139,6 +140,19 @@ export function AgentDetailDrawer({ agent, activityEvents, onClose }: Props) {
                       {agent.title}
                     </div>
                   )}
+                  {agent.urlKey && (
+                    <a
+                      href={`/${companyPrefix}/agents/${agent.urlKey}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="pixel-text"
+                      style={{ fontSize: '0.5rem', color: color, marginTop: '2px', display: 'inline-block', textDecoration: 'none' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.textDecoration = 'underline' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.textDecoration = 'none' }}
+                    >
+                      View in Paperclip →
+                    </a>
+                  )}
                   <div
                     className="pixel-text mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm"
                     style={{
@@ -199,9 +213,18 @@ export function AgentDetailDrawer({ agent, activityEvents, onClose }: Props) {
                     border: '1px solid rgba(34,211,238,0.15)',
                   }}
                 >
-                  <div className="pixel-text mb-1" style={{ fontSize: '0.55rem', color: 'var(--active)' }}>
+                  <a
+                    href={`/${companyPrefix}/issues/${agent.currentIssue.identifier}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pixel-text mb-1"
+                    style={{ fontSize: '0.55rem', color: 'var(--active)', display: 'block', textDecoration: 'none' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.textDecoration = 'underline' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.textDecoration = 'none' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {agent.currentIssue.identifier}
-                  </div>
+                  </a>
                   <div style={{ fontSize: '0.75rem', color: '#cbd5e1', lineHeight: '1.4' }}>
                     {agent.currentIssue.title}
                   </div>
@@ -212,7 +235,7 @@ export function AgentDetailDrawer({ agent, activityEvents, onClose }: Props) {
             {/* Performance metrics */}
             <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <div className="pixel-text mb-3" style={{ fontSize: '0.5rem', color: '#334155' }}>
-                PERFORMANCE (LAST 7 DAYS)
+                RECENT ACTIVITY (LAST 10 EVENTS)
               </div>
               <div className="flex gap-4">
                 <div
@@ -322,9 +345,18 @@ export function AgentDetailDrawer({ agent, activityEvents, onClose }: Props) {
                           style={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: '1.3' }}
                           title={event.issueTitle}
                         >
-                          <span className="pixel-text" style={{ fontSize: '0.5rem', color: '#475569', marginRight: '4px' }}>
+                          <a
+                            href={`/${event.issueIdentifier.split('-')[0]}/issues/${event.issueIdentifier}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="pixel-text"
+                            style={{ fontSize: '0.5rem', color: '#475569', marginRight: '4px', textDecoration: 'none' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.textDecoration = 'underline' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.textDecoration = 'none' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             {event.issueIdentifier}
-                          </span>
+                          </a>
                           {event.issueTitle}
                         </div>
                         <div className="pixel-text mt-0.5" style={{ fontSize: '0.45rem', color: '#334155' }}>

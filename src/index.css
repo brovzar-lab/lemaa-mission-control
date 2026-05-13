@@ -200,3 +200,18 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Responsive layouts ── */
+.pipeline-activity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: 1rem;
+  min-height: 380px;
+}
+
+@media (max-width: 639px) {
+  .pipeline-activity-grid {
+    grid-template-columns: 1fr;
+    min-height: unset;
+  }
+}

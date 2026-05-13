@@ -81,6 +81,8 @@ export function CommandPalette({ open, agents, pipelineIssues, onClose, onSelect
   const handleSelectIssue = useCallback(
     (issue: Issue) => {
       saveRecent({ id: issue.id, label: issue.identifier, sub: issue.title, type: 'task' })
+      const prefix = issue.identifier.split('-')[0]
+      window.open(`/${prefix}/issues/${issue.identifier}`, '_blank', 'noopener,noreferrer')
       onClose()
     },
     [onClose],
@@ -192,6 +194,9 @@ export function CommandPalette({ open, agents, pipelineIssues, onClose, onSelect
                         onSelect={() => {
                           if (item.type === 'agent') {
                             onSelectAgent(item.id)
+                          } else {
+                            const prefix = item.label.split('-')[0]
+                            window.open(`/${prefix}/issues/${item.label}`, '_blank', 'noopener,noreferrer')
                           }
                           onClose()
                         }}

@@ -1,5 +1,6 @@
 import type { Agent } from './types'
 import { AgentAvatar } from './AgentAvatar'
+import { POLL_INTERVAL_MS } from './config'
 
 interface Props {
   agents: Agent[]
@@ -81,7 +82,7 @@ export function Office({ agents, onAgentClick }: Props) {
       <div className="flex gap-6 pixel-text" style={{ fontSize: '0.55rem', color: '#475569' }}>
         <span>● ACTIVE = BOUNCING</span>
         <span>○ IDLE = FLOATING</span>
-        <span>POLLS EVERY 5s</span>
+        <span>POLLS EVERY {POLL_INTERVAL_MS / 1000}s</span>
       </div>
     </div>
   )
