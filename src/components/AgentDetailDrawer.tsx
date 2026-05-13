@@ -1,6 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import type { Agent, ActivityEvent } from '../types'
+import { useQueryClient } from '@tanstack/react-query'
+import type { Agent, ActivityEvent, Issue } from '../types'
+import { patchIssue } from '../api'
+import { toast } from '../useToast'
 
 const ROLE_COLORS: Record<string, string> = {
   ceo: '#f59e0b',
@@ -56,14 +59,31 @@ const EVENT_COLORS: Record<string, string> = {
   error: '#f87171',
 }
 
+interface TaskSuggestion {
+  id: string
+  identifier: string
+  title: string
+}
+
 interface Props {
   agent: Agent | null
+  agents: Agent[]
+  companyId: string
   activityEvents: ActivityEvent[]
   companyPrefix: string
   onClose: () => void
 }
 
-export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClose }: Props) {
+export function AgentDetailDrawer({ agent, agents, companyId, activityEvents, companyPrefix, onClose }: Props) {
+  const queryClient = useQueryClient()
+  const [showBlockedReason, setShowBlockedReason] = useState(false)
+  const [blockedReason, setBlockedReason] = useState('')
+  const [showReassign, setShowReassign] = useState(false)
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskSuggestions, setTaskSuggestions] = useState<TaskSuggestion[]>([])
+  const [confirmStop, setConfirmStop] = useState(false)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -71,6 +91,16 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Reset local state when agent changes
+  useEffect(() => {
+    setShowBlockedReason(false)
+    setBlockedReason('')
+    setShowReassign(false)
+    setTaskSearch('')
+    setTaskSuggestions([])
+    setConfirmStop(false)
+  }, [agent?.id])
 
   const agentEvents = agent
     ? activityEvents
@@ -81,6 +111,101 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
 
   const doneCount = agentEvents.filter((e) => e.type === 'done').length
   const color = agent ? getColor(agent.role) : '#22d3ee'
+
+  // Optimistic update helper — patches the pipeline-issues cache
+  const optimisticUpdateIssue = useCallback(
+    (issueId: string, update: Partial<Issue>) => {
+      queryClient.setQueryData<Issue[]>(['pipeline-issues', companyId], (old) =>
+        old?.map((i) => (i.id === issueId ? { ...i, ...update } : i)) ?? [],
+      )
+    },
+    [queryClient, companyId],
+  )
+
+  const handleMarkDone = async () => {
+    if (!agent?.currentIssue) return
+    // Find issue in cache to get id
+    const issues = queryClient.getQueryData<Issue[]>(['pipeline-issues', companyId]) ?? []
+    const issue = issues.find((i) => i.identifier === agent.currentIssue!.identifier)
+    if (!issue) return
+    const prev = issue.status
+    optimisticUpdateIssue(issue.id, { status: 'done' })
+    try {
+      await patchIssue(issue.id, { status: 'done' })
+      toast.success('Task marked done')
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      optimisticUpdateIssue(issue.id, { status: prev })
+      toast.error('Failed to mark done', handleMarkDone)
+    }
+  }
+
+  const handleMarkBlocked = async () => {
+    if (!agent?.currentIssue || !blockedReason.trim()) return
+    const issues = queryClient.getQueryData<Issue[]>(['pipeline-issues', companyId]) ?? []
+    const issue = issues.find((i) => i.identifier === agent.currentIssue!.identifier)
+    if (!issue) return
+    const prev = issue.status
+    optimisticUpdateIssue(issue.id, { status: 'blocked' })
+    try {
+      await patchIssue(issue.id, { status: 'blocked', comment: blockedReason.trim() })
+      toast.success('Task marked blocked')
+      setShowBlockedReason(false)
+      setBlockedReason('')
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      optimisticUpdateIssue(issue.id, { status: prev })
+      toast.error('Failed to mark blocked', handleMarkBlocked)
+    }
+  }
+
+  const handleReassign = async (agentId: string) => {
+    if (!agent?.currentIssue) return
+    const issues = queryClient.getQueryData<Issue[]>(['pipeline-issues', companyId]) ?? []
+    const issue = issues.find((i) => i.identifier === agent.currentIssue!.identifier)
+    if (!issue) return
+    const prev = issue.assigneeAgentId
+    optimisticUpdateIssue(issue.id, { assigneeAgentId: agentId })
+    setShowReassign(false)
+    try {
+      await patchIssue(issue.id, { assigneeAgentId: agentId })
+      toast.success('Task reassigned')
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      optimisticUpdateIssue(issue.id, { assigneeAgentId: prev })
+      toast.error('Failed to reassign', () => handleReassign(agentId))
+    }
+  }
+
+  const fetchTaskSuggestions = useCallback((q: string) => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    if (!q.trim()) { setTaskSuggestions([]); return }
+    searchDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/proxy?path=${encodeURIComponent(`/api/companies/${companyId}/issues?q=${encodeURIComponent(q)}&status=todo,backlog`)}`,
+        )
+        if (!res.ok) return
+        const data: Issue[] = await res.json()
+        setTaskSuggestions(data.slice(0, 5).map((i) => ({ id: i.id, identifier: i.identifier, title: i.title })))
+      } catch {
+        // ignore search errors
+      }
+    }, 300)
+  }, [companyId])
+
+  const handleAssignTask = async (taskId: string, taskIdentifier: string) => {
+    if (!agent) return
+    try {
+      await patchIssue(taskId, { assigneeAgentId: agent.id, status: 'todo' })
+      toast.success(`Assigned ${taskIdentifier} to ${agent.name}`)
+      setTaskSearch('')
+      setTaskSuggestions([])
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      toast.error('Failed to assign task', () => handleAssignTask(taskId, taskIdentifier))
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -105,7 +230,7 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed right-0 top-0 bottom-0 flex flex-col"
+            className="fixed right-0 top-0 bottom-0 flex flex-col overflow-y-auto"
             style={{
               width: '360px',
               zIndex: 50,
@@ -178,14 +303,13 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
               </div>
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded transition-colors flex-shrink-0"
                 style={{
                   color: '#475569',
                   backgroundColor: 'transparent',
                   border: '1px solid rgba(255,255,255,0.06)',
                   cursor: 'pointer',
                   fontSize: '0.75rem',
-                  flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#e2e8f0'
@@ -200,7 +324,7 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
               </button>
             </div>
 
-            {/* Current task */}
+            {/* Current task + write controls */}
             {agent.currentIssue && (
               <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <div className="pixel-text mb-2" style={{ fontSize: '0.5rem', color: '#334155' }}>
@@ -229,8 +353,155 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
                     {agent.currentIssue.title}
                   </div>
                 </div>
+
+                {/* Write controls */}
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  <button onClick={handleMarkDone} className="ghost-btn">Mark Done</button>
+                  <button
+                    onClick={() => setShowBlockedReason((r) => !r)}
+                    className="ghost-btn"
+                    style={{ borderColor: showBlockedReason ? 'var(--error)' : undefined }}
+                  >
+                    Mark Blocked
+                  </button>
+                  <button
+                    onClick={() => setShowReassign((r) => !r)}
+                    className="ghost-btn"
+                  >
+                    Reassign
+                  </button>
+                </div>
+
+                {showBlockedReason && (
+                  <div className="mt-2">
+                    <textarea
+                      className="w-full rounded p-2 text-sm"
+                      rows={2}
+                      style={{
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--error)',
+                        color: 'white',
+                        resize: 'vertical',
+                        outline: 'none',
+                      }}
+                      placeholder="Reason for blocking..."
+                      value={blockedReason}
+                      onChange={(e) => setBlockedReason(e.target.value)}
+                    />
+                    <button className="ghost-btn mt-1" onClick={handleMarkBlocked}>Submit</button>
+                  </div>
+                )}
+
+                {showReassign && (
+                  <div className="flex gap-2 overflow-x-auto mt-2 pb-1">
+                    {agents.filter((a) => a.id !== agent.id).map((a) => (
+                      <button
+                        key={a.id}
+                        title={a.name}
+                        onClick={() => handleReassign(a.id)}
+                        className="flex-shrink-0 flex flex-col items-center gap-1"
+                      >
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{
+                            backgroundColor: (ROLE_COLORS[a.role] ?? ROLE_COLORS.default) + '33',
+                            border: `2px solid ${ROLE_COLORS[a.role] ?? ROLE_COLORS.default}`,
+                            color: ROLE_COLORS[a.role] ?? ROLE_COLORS.default,
+                            fontSize: '0.55rem',
+                          }}
+                        >
+                          {getInitials(a.name)}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Active Run section */}
+            {agent.activeRun && (
+              <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div className="pixel-text mb-2" style={{ fontSize: '0.5rem', color: '#334155' }}>
+                  ACTIVE RUN
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="mono" style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    {agent.activeRun.id.slice(0, 8)} · {formatRunDuration(agent.activeRun.startedAt)}
+                  </span>
+                  {!confirmStop ? (
+                    <button
+                      onClick={() => setConfirmStop(true)}
+                      className="ghost-btn"
+                      style={{ borderColor: 'var(--error)', color: 'var(--error)', fontSize: '0.7rem' }}
+                    >
+                      Cancel Run
+                    </button>
+                  ) : (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          toast.error('Run cancellation not yet available via API')
+                          setConfirmStop(false)
+                        }}
+                        className="ghost-btn"
+                        style={{ borderColor: 'var(--error)', color: 'var(--error)', fontSize: '0.7rem' }}
+                      >
+                        Confirm
+                      </button>
+                      <button onClick={() => setConfirmStop(false)} className="ghost-btn" style={{ fontSize: '0.7rem' }}>No</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Assign New Task */}
+            <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="pixel-text mb-2" style={{ fontSize: '0.5rem', color: '#334155' }}>
+                ASSIGN NEW TASK
+              </div>
+              <input
+                className="w-full rounded px-2 py-1.5 text-sm"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'white',
+                  outline: 'none',
+                }}
+                placeholder="Search tasks..."
+                value={taskSearch}
+                onChange={(e) => {
+                  setTaskSearch(e.target.value)
+                  fetchTaskSuggestions(e.target.value)
+                }}
+              />
+              {taskSuggestions.length > 0 && (
+                <div
+                  className="mt-1 rounded"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {taskSuggestions.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex justify-between items-center px-2 py-2 hover:bg-white/5 cursor-default"
+                    >
+                      <span className="text-xs truncate flex-1 mr-2" style={{ color: '#94a3b8' }}>
+                        <span className="mono mr-1" style={{ color: '#475569', fontSize: '0.6rem' }}>{t.identifier}</span>
+                        {t.title.slice(0, 38)}{t.title.length > 38 ? '…' : ''}
+                      </span>
+                      <button
+                        className="ghost-btn flex-shrink-0"
+                        style={{ fontSize: '0.65rem', padding: '2px 8px' }}
+                        onClick={() => handleAssignTask(t.id, t.identifier)}
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Performance metrics */}
             <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -245,10 +516,7 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
                     border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <div
-                    className="font-bold tabular"
-                    style={{ fontSize: '1.25rem', color: '#34d399' }}
-                  >
+                  <div className="font-bold tabular" style={{ fontSize: '1.25rem', color: '#34d399' }}>
                     {agentEvents.filter((e) => e.type === 'done').length}
                   </div>
                   <div className="pixel-text" style={{ fontSize: '0.45rem', color: '#475569', marginTop: '2px' }}>
@@ -262,10 +530,7 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
                     border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <div
-                    className="font-bold tabular"
-                    style={{ fontSize: '1.25rem', color: '#f59e0b' }}
-                  >
+                  <div className="font-bold tabular" style={{ fontSize: '1.25rem', color: '#f59e0b' }}>
                     {agentEvents.filter((e) => e.type === 'blocked').length}
                   </div>
                   <div className="pixel-text" style={{ fontSize: '0.45rem', color: '#475569', marginTop: '2px' }}>
@@ -279,10 +544,7 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
                     border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <div
-                    className="font-bold tabular"
-                    style={{ fontSize: '1.25rem', color: color }}
-                  >
+                  <div className="font-bold tabular" style={{ fontSize: '1.25rem', color: color }}>
                     {agentEvents.length}
                   </div>
                   <div className="pixel-text" style={{ fontSize: '0.45rem', color: '#475569', marginTop: '2px' }}>
@@ -303,7 +565,7 @@ export function AgentDetailDrawer({ agent, activityEvents, companyPrefix, onClos
             </div>
 
             {/* Task history */}
-            <div className="flex-1 overflow-y-auto px-5 py-4" style={{ minHeight: 0 }}>
+            <div className="flex-1 px-5 py-4">
               <div className="pixel-text mb-3" style={{ fontSize: '0.5rem', color: '#334155' }}>
                 RECENT ACTIVITY
               </div>

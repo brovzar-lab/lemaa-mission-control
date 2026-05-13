@@ -12,6 +12,7 @@ import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { AgentDetailDrawer } from './components/AgentDetailDrawer'
 import { CommandPalette } from './components/CommandPalette'
 import { HealthOrb } from './components/HealthOrb'
+import { ToastSystem } from './components/ToastSystem'
 import { isDemoMode, POLL_INTERVAL_MS, COMPANIES, getSelectedCompany, saveSelectedCompany } from './config'
 import type { Company } from './config'
 
@@ -286,6 +287,7 @@ export default function App() {
                   ? [...(pipelineIssues ?? []).filter((i) => i.status === 'blocked'), ...(pipelineIssues ?? []).filter((i) => i.status !== 'blocked')]
                   : (pipelineIssues ?? [])}
                 agents={agents}
+                companyId={selectedCompany.id}
                 isRefreshing={isPipelineFetching}
               />
               <ActivityFeed
@@ -347,10 +349,15 @@ export default function App() {
       {/* Agent detail drawer */}
       <AgentDetailDrawer
         agent={selectedAgent}
+        agents={agents ?? []}
+        companyId={selectedCompany.id}
         activityEvents={activityEvents ?? []}
         companyPrefix={companyPrefix}
         onClose={handleCloseDrawer}
       />
+
+      {/* Toast notifications */}
+      <ToastSystem />
 
       {/* Command palette */}
       <CommandPalette

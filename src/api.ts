@@ -14,3 +14,32 @@ export function apiHeaders(): HeadersInit {
   }
   return {}
 }
+
+// Write operations always go through the proxy so PAPERCLIP_WRITE_API_KEY never reaches the browser.
+export async function patchIssue(issueId: string, body: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`/api/proxy?path=${encodeURIComponent(`/api/issues/${issueId}`)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(await res.text())
+}
+
+export async function postComment(issueId: string, commentBody: string): Promise<void> {
+  const res = await fetch(`/api/proxy?path=${encodeURIComponent(`/api/issues/${issueId}/comments`)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body: commentBody }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+}
+
+export async function createIssue(companyId: string, payload: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch(`/api/proxy?path=${encodeURIComponent(`/api/companies/${companyId}/issues`)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}

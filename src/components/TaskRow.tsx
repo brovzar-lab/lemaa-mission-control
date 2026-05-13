@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Issue, Agent } from '../types'
+import { patchIssue, postComment } from '../api'
+import { toast } from '../useToast'
 
 const PRIORITY_CHIP: Record<string, { bg: string; text: string; label: string }> = {
   critical: { bg: 'rgba(248,113,113,0.2)', text: '#f87171', label: 'CRITICAL' },
@@ -34,14 +37,29 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
+const STATUS_OPTIONS = [
+  { value: 'todo', label: 'Todo' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'blocked', label: 'Blocked' },
+  { value: 'done', label: 'Done' },
+]
+
 interface Props {
   issue: Issue
   agents: Agent[]
+  companyId: string
   isRefreshing?: boolean
 }
 
-export function TaskRow({ issue, agents, isRefreshing }: Props) {
+export function TaskRow({ issue, agents, companyId, isRefreshing }: Props) {
+  const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
+  const [showComment, setShowComment] = useState(false)
+  const [commentBody, setCommentBody] = useState('')
+  const [showBlockedReason, setShowBlockedReason] = useState(false)
+  const [blockedReason, setBlockedReason] = useState('')
+  const [submittingComment, setSubmittingComment] = useState(false)
+  const commentRef = useRef<HTMLTextAreaElement>(null)
 
   const agent = agents.find((a) => a.id === issue.assigneeAgentId)
   const isBlocked = issue.status === 'blocked'
@@ -51,6 +69,77 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
   const initials = agent ? getInitials(agent.name) : '??'
   const relTime = getRelativeTime(issue.updatedAt)
   const isoTime = new Date(issue.updatedAt).toISOString()
+
+  const optimisticUpdate = useCallback(
+    (update: Partial<Issue>) => {
+      queryClient.setQueryData<Issue[]>(['pipeline-issues', companyId], (old) =>
+        old?.map((i) => (i.id === issue.id ? { ...i, ...update } : i)) ?? [],
+      )
+    },
+    [queryClient, companyId, issue.id],
+  )
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === issue.status) return
+    if (newStatus === 'blocked') {
+      setShowBlockedReason(true)
+      return
+    }
+    const prev = issue.status
+    optimisticUpdate({ status: newStatus })
+    try {
+      await patchIssue(issue.id, { status: newStatus })
+      toast.success(`Status → ${newStatus.replace('_', ' ')}`)
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      optimisticUpdate({ status: prev })
+      toast.error('Failed to update status', () => handleStatusChange(newStatus))
+    }
+  }
+
+  const handleSubmitBlocked = async () => {
+    if (!blockedReason.trim()) return
+    const prev = issue.status
+    optimisticUpdate({ status: 'blocked' })
+    try {
+      await patchIssue(issue.id, { status: 'blocked', comment: blockedReason.trim() })
+      toast.success('Task marked blocked')
+      setShowBlockedReason(false)
+      setBlockedReason('')
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      optimisticUpdate({ status: prev })
+      toast.error('Failed to mark blocked', handleSubmitBlocked)
+    }
+  }
+
+  const handleReassignTask = async (agentId: string) => {
+    const prev = issue.assigneeAgentId
+    optimisticUpdate({ assigneeAgentId: agentId || null })
+    try {
+      await patchIssue(issue.id, { assigneeAgentId: agentId || null })
+      toast.success('Reassigned')
+      queryClient.invalidateQueries({ queryKey: ['pipeline-issues', companyId] })
+    } catch {
+      optimisticUpdate({ assigneeAgentId: prev })
+      toast.error('Failed to reassign', () => handleReassignTask(agentId))
+    }
+  }
+
+  const handlePostComment = async () => {
+    if (!commentBody.trim() || submittingComment) return
+    setSubmittingComment(true)
+    try {
+      await postComment(issue.id, commentBody.trim())
+      toast.success('Comment posted')
+      setCommentBody('')
+      setShowComment(false)
+    } catch {
+      toast.error('Failed to post comment', handlePostComment)
+    } finally {
+      setSubmittingComment(false)
+    }
+  }
 
   return (
     <div
@@ -122,7 +211,6 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
 
         {/* Right meta */}
         <div className="flex-shrink-0 flex items-center gap-2">
-          {/* Priority badge */}
           <span
             className="px-1.5 py-0.5 rounded font-semibold"
             style={{
@@ -134,8 +222,6 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
           >
             {chip.label}
           </span>
-
-          {/* Relative timestamp */}
           <span
             className="tabular hidden sm:block"
             style={{ fontSize: '0.65rem', color: '#475569' }}
@@ -143,26 +229,15 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
           >
             {relTime}
           </span>
-
-          {/* Expand chevron */}
           <svg
             className="flex-shrink-0 transition-transform duration-200"
-            style={{
-              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              color: '#475569',
-            }}
+            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', color: '#475569' }}
             width="12"
             height="12"
             viewBox="0 0 12 12"
             fill="none"
           >
-            <path
-              d="M2 4l4 4 4-4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       </div>
@@ -172,6 +247,7 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
         <div
           className="px-3 pb-3 animate-fade-in"
           style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+          onClick={(e) => e.stopPropagation()}
         >
           {agent && (
             <div className="flex items-center gap-1.5 mt-2 mb-2">
@@ -197,7 +273,7 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
           )}
 
           {isBlocked && issue.blockedBy && issue.blockedBy.length > 0 && (
-            <div className="mt-2">
+            <div className="mt-2 mb-3">
               <div
                 className="mb-1"
                 style={{ fontSize: '0.6rem', color: '#f59e0b', letterSpacing: '0.05em', textTransform: 'uppercase' }}
@@ -222,12 +298,139 @@ export function TaskRow({ issue, agents, isRefreshing }: Props) {
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.2)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
-                    onClick={(e) => e.stopPropagation()}
                     title={b.title}
                   >
                     {b.identifier}
                   </a>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Write controls strip */}
+          <div
+            className="mt-3 pt-3 flex flex-wrap gap-2 items-center"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+          >
+            {/* Status dropdown */}
+            <select
+              className="text-xs rounded px-2 py-1"
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+              value={issue.status}
+              onChange={(e) => handleStatusChange(e.target.value)}
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+
+            {/* Assign To dropdown */}
+            <select
+              className="text-xs rounded px-2 py-1"
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+              value={issue.assigneeAgentId ?? ''}
+              onChange={(e) => handleReassignTask(e.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+
+            {/* Comment button */}
+            {!showComment ? (
+              <button
+                className="ghost-btn"
+                style={{ fontSize: '0.7rem', padding: '3px 10px' }}
+                onClick={() => {
+                  setShowComment(true)
+                  setTimeout(() => commentRef.current?.focus(), 50)
+                }}
+              >
+                + Comment
+              </button>
+            ) : null}
+          </div>
+
+          {/* Blocked reason textarea */}
+          {showBlockedReason && (
+            <div className="mt-2">
+              <textarea
+                className="w-full text-xs rounded p-2"
+                rows={2}
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--error)',
+                  color: 'white',
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+                placeholder="Reason for blocking..."
+                value={blockedReason}
+                onChange={(e) => setBlockedReason(e.target.value)}
+              />
+              <div className="flex gap-1 mt-1">
+                <button className="ghost-btn" style={{ fontSize: '0.7rem', padding: '3px 10px' }} onClick={handleSubmitBlocked}>
+                  Submit
+                </button>
+                <button
+                  className="ghost-btn"
+                  style={{ fontSize: '0.7rem', padding: '3px 10px' }}
+                  onClick={() => { setShowBlockedReason(false); setBlockedReason('') }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Comment textarea */}
+          {showComment && (
+            <div className="mt-2">
+              <textarea
+                ref={commentRef}
+                className="w-full text-xs rounded p-2"
+                rows={3}
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'white',
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+                placeholder="Add a comment... (⌘↵ to submit)"
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePostComment()
+                }}
+              />
+              <div className="flex gap-1 mt-1">
+                <button
+                  className="ghost-btn"
+                  style={{ fontSize: '0.7rem', padding: '3px 10px', opacity: submittingComment ? 0.5 : 1 }}
+                  onClick={handlePostComment}
+                  disabled={submittingComment}
+                >
+                  {submittingComment ? 'Posting…' : 'Post'}
+                </button>
+                <button
+                  className="ghost-btn"
+                  style={{ fontSize: '0.7rem', padding: '3px 10px' }}
+                  onClick={() => { setShowComment(false); setCommentBody('') }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           )}

@@ -14,10 +14,11 @@ const TABS: { id: Tab; label: string }[] = [
 interface Props {
   issues: Issue[]
   agents: Agent[]
+  companyId: string
   isRefreshing?: boolean
 }
 
-export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
+export function PipelinePanel({ issues, agents, companyId, isRefreshing }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('in_progress')
 
   const counts = {
@@ -156,6 +157,7 @@ export function PipelinePanel({ issues, agents, isRefreshing }: Props) {
               key={issue.id}
               issue={issue}
               agents={agents}
+              companyId={companyId}
               isRefreshing={isRefreshing}
             />
           ))
