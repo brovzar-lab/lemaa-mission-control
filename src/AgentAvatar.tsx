@@ -14,12 +14,7 @@ function getColor(role: string): string {
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
 function formatRunDuration(startedAt: string): string {
@@ -28,6 +23,26 @@ function formatRunDuration(startedAt: string): string {
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m`
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
+function getAuraStyle(status: string, isBlocked: boolean): React.CSSProperties {
+  if (isBlocked || status === 'blocked') {
+    return {
+      boxShadow: '0 0 0 3px var(--aura-blocked), var(--glow-blocked)',
+      animation: 'blocked-pulse 1.5s ease-in-out infinite',
+      border: 'none',
+    }
+  }
+  if (status === 'running' || status === 'active') {
+    return {
+      boxShadow: '0 0 0 3px var(--aura-active), var(--glow-cyan)',
+      border: 'none',
+    }
+  }
+  return {
+    boxShadow: '0 0 0 2px var(--aura-idle)',
+    border: 'none',
+  }
 }
 
 interface Props {
@@ -41,6 +56,7 @@ export function AgentAvatar({ agent, index, onClick }: Props) {
   const isBlocked = agent.currentIssue?.status === 'blocked'
   const color = getColor(agent.role)
   const initials = getInitials(agent.name)
+  const agentStatus = isBlocked ? 'blocked' : isActive ? 'active' : 'idle'
 
   return (
     <div
@@ -58,51 +74,62 @@ export function AgentAvatar({ agent, index, onClick }: Props) {
         style={{ backgroundColor: '#4b3f2a', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}
       />
 
-      {/* Avatar with animation */}
+      {/* Avatar with aura ring */}
       <div
-        className={`relative -mt-2 w-12 h-12 rounded-sm flex items-center justify-center text-sm font-bold select-none transition-[filter] duration-150 group-hover:brightness-125 ${
-          isActive ? 'animate-bounce' : 'animate-float'
-        }`}
+        className="relative -mt-2 select-none"
         style={{
-          backgroundColor: color + '33',
-          border: `2px solid ${isBlocked ? '#f59e0b' : color}`,
-          color,
-          imageRendering: 'pixelated',
-          outline: isBlocked ? '2px solid rgba(245,158,11,0.5)' : 'none',
-          outlineOffset: '2px',
+          width: 48,
+          height: 48,
+          transition: 'transform 150ms ease',
+          ...getAuraStyle(agentStatus, isBlocked),
+          borderRadius: '50%',
         }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.05)' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)' }}
       >
-        {initials}
+        <div
+          className="w-full h-full rounded-full flex items-center justify-center text-sm font-bold transition-[filter] duration-150 group-hover:brightness-125"
+          style={{
+            backgroundColor: color + '33',
+            color: isBlocked ? 'var(--aura-blocked)' : isActive ? 'var(--accent-cyan)' : color,
+            fontFamily: 'Orbitron, sans-serif',
+            fontSize: '0.65rem',
+          }}
+        >
+          {initials}
+        </div>
 
-        {/* Active pulse ring — 40% opacity per M7 */}
-        {isActive && (
-          <span
-            className="absolute inset-0 rounded-sm animate-pulse_ring"
-            style={{ border: `2px solid ${color}`, opacity: 0.4 }}
-          />
-        )}
-
-        {/* H3: Blocked task warning badge */}
-        {isBlocked && (
-          <span
-            className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
-            style={{
-              backgroundColor: '#f59e0b',
-              color: '#0f0f0f',
-              fontSize: '0.5rem',
-              lineHeight: 1,
-              boxShadow: '0 0 6px rgba(245,158,11,0.6)',
-            }}
-          >
-            !
-          </span>
-        )}
+        {/* Role badge */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -2,
+            right: -2,
+            width: 18,
+            height: 18,
+            background: 'var(--accent-violet)',
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Orbitron, sans-serif',
+            fontSize: '0.55rem',
+            fontWeight: 700,
+            color: 'white',
+            zIndex: 10,
+          }}
+        >
+          {(agent.role ?? 'AG').slice(0, 2).toUpperCase()}
+        </div>
       </div>
 
       {/* Name label */}
       <div
         className="pixel-text text-center max-w-[80px] truncate"
-        style={{ color, fontSize: '0.6rem' }}
+        style={{
+          color: isBlocked ? 'var(--aura-blocked)' : isActive ? 'var(--accent-cyan)' : 'var(--idle)',
+          fontSize: '0.6rem',
+        }}
         title={agent.name}
       >
         {agent.name}
@@ -111,7 +138,7 @@ export function AgentAvatar({ agent, index, onClick }: Props) {
       {/* Status badge */}
       <div
         className="pixel-text max-w-[100px] truncate"
-        style={{ fontSize: '0.5rem', color: isBlocked ? '#f59e0b' : isActive ? '#4ade80' : '#6b7280' }}
+        style={{ fontSize: '0.5rem', color: isBlocked ? 'var(--aura-blocked)' : isActive ? '#4ade80' : '#6b7280' }}
         title={isActive && agent.currentIssue ? `${agent.currentIssue.identifier}: ${agent.currentIssue.title}` : undefined}
       >
         {isActive && agent.activeRun
@@ -130,7 +157,7 @@ export function AgentAvatar({ agent, index, onClick }: Props) {
           {isActive && agent.currentIssue && (
             <div
               className="truncate max-w-[200px]"
-              style={{ color: isBlocked ? '#f59e0b' : '#4ade80', fontSize: '0.65rem' }}
+              style={{ color: isBlocked ? 'var(--aura-blocked)' : '#4ade80', fontSize: '0.65rem' }}
               title={`${agent.currentIssue.identifier}: ${agent.currentIssue.title}`}
             >
               {isBlocked ? '⚠ BLOCKED — ' : ''}{agent.currentIssue.identifier}: {agent.currentIssue.title}

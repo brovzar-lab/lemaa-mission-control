@@ -33,8 +33,9 @@ export function Office({ agents, onAgentClick }: Props) {
         <div
           className="w-full"
           style={{
-            transform: 'rotateX(30deg)',
+            transform: 'rotateX(8deg)',
             transformStyle: 'preserve-3d',
+            transformOrigin: 'top center',
           }}
         >
           {/* Floor */}
@@ -47,6 +48,19 @@ export function Office({ agents, onAgentClick }: Props) {
               minHeight: '280px',
             }}
           >
+            {/* V4 vignette + grid overlay */}
+            <div
+              className="absolute inset-0 rounded-lg pointer-events-none"
+              style={{
+                background: `
+                  radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%),
+                  repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,212,255,0.04) 40px),
+                  repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,212,255,0.04) 40px)
+                `,
+                zIndex: 1,
+              }}
+            />
+
             {/* Floor grid lines */}
             <div
               className="absolute inset-0 rounded-lg opacity-20"
@@ -58,7 +72,7 @@ export function Office({ agents, onAgentClick }: Props) {
             />
 
             {/* Agent desks grid */}
-            <div className="relative z-10 flex flex-wrap justify-center gap-6">
+            <div className="relative z-20 flex flex-wrap justify-center gap-6">
               {agents.map((agent, i) => (
                 <div key={agent.id} className="relative">
                   <AgentAvatar agent={agent} index={i} onClick={() => onAgentClick(agent.id)} />

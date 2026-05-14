@@ -25,6 +25,19 @@
 
   --accent-primary: #818CF8;
   --accent-glow: rgba(129, 140, 248, 0.15);
+
+  --bg-abyss:      #04060D;
+  --accent-cyan:   #00D4FF;
+  --accent-violet: #7C3AED;
+  --accent-gradient: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+  --aura-active:   #00D4FF;
+  --aura-blocked:  #FF6B35;
+  --aura-idle:     #334155;
+  --aura-done:     #10B981;
+  --glow-cyan:     0 0 8px rgba(0,212,255,0.6), 0 0 24px rgba(0,212,255,0.3), 0 0 48px rgba(0,212,255,0.1);
+  --glow-violet:   0 0 8px rgba(124,58,237,0.6), 0 0 24px rgba(124,58,237,0.3);
+  --glow-blocked:  0 0 8px rgba(255,107,53,0.6), 0 0 24px rgba(255,107,53,0.3), 0 0 48px rgba(255,107,53,0.1);
+  --glow-success:  0 0 8px rgba(16,185,129,0.6), 0 0 24px rgba(16,185,129,0.3);
 }
 
 @layer base {
@@ -236,4 +249,57 @@
 .ghost-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── V4 Utility Classes ── */
+.orbitron-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.section-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(0, 212, 255, 0.7);
+}
+.task-id {
+  font-size: 0.75rem;
+  font-family: Orbitron, sans-serif;
+  color: var(--accent-cyan);
+}
+
+/* ── V4 Keyframes ── */
+@keyframes blocked-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--aura-blocked), var(--glow-blocked); }
+  50% { box-shadow: 0 0 0 5px var(--aura-blocked), 0 0 32px rgba(255,107,53,0.5); }
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes orb-wave {
+  0%, 100% { border-radius: 45% 55% 50% 50% / 50% 50% 55% 45%; }
+  50% { border-radius: 55% 45% 45% 55% / 55% 45% 55% 45%; }
+}
+@keyframes orb-ripple {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes triage-enter {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes row-slide-out {
+  from { opacity: 1; transform: translateX(0); max-height: 200px; }
+  to { opacity: 0; transform: translateX(20px); max-height: 0; overflow: hidden; }
+}
+@keyframes orb-pulse-green {
+  0%, 100% { box-shadow: 0 0 0 3px var(--aura-done), var(--glow-success); }
+  50% { box-shadow: 0 0 0 6px var(--aura-done), 0 0 32px rgba(16,185,129,0.6); }
 }

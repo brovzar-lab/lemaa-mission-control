@@ -246,7 +246,11 @@ export function TaskRow({ issue, agents, companyId, isRefreshing }: Props) {
       {expanded && (
         <div
           className="px-3 pb-3 animate-fade-in"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+          style={{
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            borderLeft: isBlocked ? '2px solid var(--aura-blocked)' : '2px solid var(--accent-cyan)',
+            ...(isBlocked ? { boxShadow: 'inset 4px 0 12px rgba(255,107,53,0.12)' } : {}),
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {agent && (

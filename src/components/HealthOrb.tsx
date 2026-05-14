@@ -1,75 +1,78 @@
-import type { Issue } from '../types'
-
-type HealthStatus = 'operational' | 'degraded' | 'critical'
-
-function computeHealth(issues: Issue[]): HealthStatus {
-  if (issues.length === 0) return 'operational'
-  const blockedCount = issues.filter((i) => i.status === 'blocked').length
-  const ratio = blockedCount / issues.length
-  if (ratio > 0.3) return 'critical'
-  if (ratio >= 0.1) return 'degraded'
-  return 'operational'
+interface HealthOrbProps {
+  healthPercent: number
+  isIncident: boolean
+  onClick?: () => void
+  pulseGreen?: boolean
 }
 
-const HEALTH_CONFIG = {
-  operational: {
-    color: 'var(--active)',
-    glow: 'var(--active-glow)',
-    label: 'All Systems Operational',
-    cssColor: '#22D3EE',
-  },
-  degraded: {
-    color: 'var(--paused)',
-    glow: 'var(--paused-glow)',
-    label: 'Degraded',
-    cssColor: '#F59E0B',
-  },
-  critical: {
-    color: 'var(--error)',
-    glow: 'var(--error-glow)',
-    label: 'Critical',
-    cssColor: '#F87171',
-  },
-}
-
-interface Props {
-  issues: Issue[]
-}
-
-export function HealthOrb({ issues }: Props) {
-  const status = computeHealth(issues)
-  const cfg = HEALTH_CONFIG[status]
-
+export function HealthOrb({ healthPercent, isIncident, onClick, pulseGreen }: HealthOrbProps) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div
+      className="flex flex-col items-center gap-2"
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      title={onClick && isIncident ? 'Click to triage blocked issues' : undefined}
+    >
       <div
-        className="relative"
-        style={{ width: '10px', height: '10px' }}
+        style={{
+          position: 'relative',
+          width: 48,
+          height: 48,
+          borderRadius: '50%',
+          overflow: 'hidden',
+          border: `2px solid ${pulseGreen ? 'var(--aura-done)' : isIncident ? 'var(--aura-blocked)' : 'var(--aura-active)'}`,
+          boxShadow: pulseGreen ? 'var(--glow-success)' : isIncident ? 'var(--glow-blocked)' : 'var(--glow-cyan)',
+          animation: pulseGreen ? 'orb-pulse-green 0.8s ease-in-out 3' : undefined,
+        }}
       >
-        {/* Radial glow */}
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-abyss)' }} />
         <div
-          className="absolute rounded-full"
           style={{
-            inset: '-4px',
-            backgroundColor: cfg.glow,
-            borderRadius: '50%',
-            filter: 'blur(4px)',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${healthPercent}%`,
+            background: pulseGreen ? 'var(--aura-done)' : isIncident ? 'var(--aura-blocked)' : 'var(--aura-active)',
+            opacity: 0.8,
+            transition: 'height 600ms ease-in-out',
+            animation: 'orb-wave 3s ease-in-out infinite',
           }}
         />
-        {/* Orb */}
         <div
-          className="absolute inset-0 rounded-full animate-pulse"
           style={{
-            backgroundColor: cfg.color,
-            boxShadow: `0 0 8px 2px ${cfg.cssColor}88, 0 0 16px 4px ${cfg.cssColor}33`,
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Orbitron, sans-serif',
+            fontWeight: 700,
+            fontSize: '0.65rem',
+            color: 'white',
+            zIndex: 2,
           }}
-        />
+        >
+          {Math.round(healthPercent)}%
+        </div>
+        {isIncident && !pulseGreen && [0, 0.5, 1].map((delay) => (
+          <div
+            key={delay}
+            style={{
+              position: 'absolute',
+              inset: -4,
+              borderRadius: '50%',
+              border: '2px solid var(--aura-blocked)',
+              animation: `orb-ripple 2s ease-out ${delay}s infinite`,
+              opacity: 0,
+            }}
+          />
+        ))}
       </div>
-      <span
-        className="pixel-text"
-        style={{ fontSize: '0.55rem', color: cfg.color }}
-      >
-        {cfg.label}
+      <span className="section-label" style={{ fontSize: '0.5rem' }}>
+        {isIncident ? 'INCIDENT' : 'HEALTH'}
       </span>
     </div>
   )

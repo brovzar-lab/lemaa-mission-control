@@ -13,8 +13,12 @@ import { AgentDetailDrawer } from './components/AgentDetailDrawer'
 import { CommandPalette } from './components/CommandPalette'
 import { HealthOrb } from './components/HealthOrb'
 import { ToastSystem } from './components/ToastSystem'
+import { LiveClock } from './components/LiveClock'
+import { EventTicker } from './components/EventTicker'
+import { TriageModal } from './components/TriageModal'
 import { isDemoMode, POLL_INTERVAL_MS, COMPANIES, getSelectedCompany, saveSelectedCompany } from './config'
 import type { Company } from './config'
+import type { Issue } from './types'
 
 function LoadingScreen() {
   return (
@@ -88,6 +92,7 @@ export default function App() {
   const [selectedCompany, setSelectedCompany] = useState<Company>(getSelectedCompany)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [triageOpen, setTriageOpen] = useState(false)
 
   const {
     data: agents,
@@ -128,6 +133,12 @@ export default function App() {
     return blocked / active.length > 0.4
   }, [pipelineIssues])
 
+  const healthPercent = useMemo(() => {
+    const list = agents ?? []
+    if (list.length === 0) return 100
+    return (list.filter((a) => a.currentIssue?.status !== 'blocked').length / list.length) * 100
+  }, [agents])
+
   const handleCloseCommandPalette = useCallback(() => setCommandPaletteOpen(false), [])
   const handleCloseDrawer = useCallback(() => setSelectedAgentId(null), [])
 
@@ -167,9 +178,11 @@ export default function App() {
       className="min-h-screen relative scanlines flex flex-col"
       style={{ backgroundColor: 'var(--bg-void)' }}
     >
+      <EventTicker events={(activityEvents ?? []).slice(0, 10).map((e) => `${e.issueIdentifier}: ${e.issueTitle}`)} />
+
       {/* Header */}
       <header
-        className="w-full px-5 py-2.5 flex items-center justify-between flex-shrink-0"
+        className="w-full px-5 py-2.5 flex items-center justify-between flex-shrink-0 min-h-[64px]"
         style={{
           background: 'linear-gradient(180deg, rgba(13,17,23,0.98) 0%, rgba(8,11,20,0.95) 100%)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -222,17 +235,30 @@ export default function App() {
 
         {/* Center: global health orb */}
         <div className="absolute left-1/2" style={{ transform: 'translateX(-50%)' }}>
-          {agents && <HealthOrb issues={pipelineIssues?.filter((i) => i.status !== 'todo') ?? []} />}
+          {agents && (
+            <HealthOrb
+              healthPercent={healthPercent}
+              isIncident={incidentMode}
+              onClick={incidentMode ? () => setTriageOpen(true) : undefined}
+            />
+          )}
         </div>
 
         {/* Right: company switcher + last sync + refresh ring */}
         <div className="flex items-center gap-4">
+          <LiveClock />
           <CompanySwitcher selected={selectedCompany} onChange={handleCompanyChange} />
           {dataUpdatedAt > 0 && (
             <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#64748b' }}>
               Last sync {new Date(dataUpdatedAt).toLocaleTimeString()}
             </span>
           )}
+          <kbd
+            className="section-label"
+            style={{ border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 6px' }}
+          >
+            ⌘K
+          </kbd>
           <RefreshCountdownRing
             intervalMs={POLL_INTERVAL_MS}
             lastUpdatedAt={lastUpdated}
@@ -240,6 +266,8 @@ export default function App() {
           />
         </div>
       </header>
+
+      <div className="h-px flex-shrink-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.3), transparent)' }} />
 
       {/* Main content */}
       <main className="flex-1 px-4 pb-6 pt-4 flex flex-col gap-4 max-w-screen-2xl w-full mx-auto">
@@ -364,10 +392,24 @@ export default function App() {
         open={commandPaletteOpen}
         agents={agents ?? []}
         pipelineIssues={pipelineIssues ?? []}
+        companyId={selectedCompany.id}
         onClose={handleCloseCommandPalette}
         onSelectAgent={(id) => {
           setSelectedAgentId(id)
           setCommandPaletteOpen(false)
+        }}
+      />
+
+      {/* Triage modal */}
+      <TriageModal
+        isOpen={triageOpen}
+        onClose={() => setTriageOpen(false)}
+        blockedIssues={(pipelineIssues ?? []).filter((i) => i.status === 'blocked')}
+        agents={agents ?? []}
+        onUpdate={(issueId, patch) => {
+          queryClient.setQueryData<Issue[]>(['pipeline-issues', selectedCompany.id], (old) =>
+            old?.map((i) => (i.id === issueId ? { ...i, ...patch } : i)) ?? []
+          )
         }}
       />
     </div>

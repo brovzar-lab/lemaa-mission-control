@@ -32,6 +32,7 @@ export interface Issue {
   priority: string
   assigneeAgentId: string | null
   blockedBy?: BlockerRef[]
+  blockedByIssueIds?: string[]
   updatedAt: string
   startedAt?: string | null
 }
