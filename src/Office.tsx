@@ -74,7 +74,14 @@ export function Office({ agents, onAgentClick }: Props) {
             {/* Agent desks grid */}
             <div className="relative z-20 flex flex-wrap justify-center gap-6">
               {agents.map((agent, i) => (
-                <div key={agent.id} className="relative">
+                <div
+                  key={agent.id}
+                  className="relative"
+                  data-agent-card
+                  tabIndex={0}
+                  style={{ outline: 'none' }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') onAgentClick(agent.id) }}
+                >
                   <AgentAvatar agent={agent} index={i} onClick={() => onAgentClick(agent.id)} />
                 </div>
               ))}

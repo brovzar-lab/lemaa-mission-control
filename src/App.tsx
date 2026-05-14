@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAgents } from './useAgents'
 import { usePipelineIssues } from './useIssues'
@@ -16,9 +17,15 @@ import { ToastSystem } from './components/ToastSystem'
 import { LiveClock } from './components/LiveClock'
 import { EventTicker } from './components/EventTicker'
 import { TriageModal } from './components/TriageModal'
+import { ShortcutOverlay } from './components/ShortcutOverlay'
+import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { isDemoMode, POLL_INTERVAL_MS, COMPANIES, getSelectedCompany, saveSelectedCompany } from './config'
 import type { Company } from './config'
 import type { Issue } from './types'
+
+type PipelineTab = 'in_progress' | 'blocked' | 'in_review' | 'todo'
+
+const STAGGER = { initial: { y: 12, opacity: 0 }, animate: { y: 0, opacity: 1 } }
 
 function LoadingScreen() {
   return (
@@ -93,6 +100,9 @@ export default function App() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [triageOpen, setTriageOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [pipelineTab, setPipelineTab] = useState<PipelineTab>('in_progress')
+  const mainRef = useRef<HTMLElement>(null)
 
   const {
     data: agents,
@@ -142,27 +152,39 @@ export default function App() {
   const handleCloseCommandPalette = useCallback(() => setCommandPaletteOpen(false), [])
   const handleCloseDrawer = useCallback(() => setSelectedAgentId(null), [])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setCommandPaletteOpen((v) => !v)
-        return
-      }
-      if (!commandPaletteOpen && e.key === 'r') {
-        e.preventDefault()
-        queryClient.invalidateQueries({ queryKey: ['agents', selectedCompany.id] })
-        refetchPipeline()
-        return
-      }
-      if (!commandPaletteOpen && e.key === 'f') {
-        e.preventDefault()
-        setCommandPaletteOpen(true)
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [commandPaletteOpen, queryClient, selectedCompany.id, refetchPipeline])
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['agents', selectedCompany.id] })
+    refetchPipeline()
+  }, [queryClient, selectedCompany.id, refetchPipeline])
+
+  useKeyboardShortcuts({
+    onNewTask: useCallback(() => {
+      setCommandPaletteOpen(true)
+    }, []),
+    onFilterBlocked: useCallback(() => {
+      setPipelineTab('blocked')
+      document.querySelector('.pipeline-section')?.scrollIntoView({ behavior: 'smooth' })
+    }, []),
+    onScrollOffice: useCallback(() => {
+      document.querySelector('.office-section')?.scrollIntoView({ behavior: 'smooth' })
+    }, []),
+    onFocusPipeline: useCallback(() => {
+      document.querySelector('.pipeline-section')?.scrollIntoView({ behavior: 'smooth' })
+    }, []),
+    onResetHome: useCallback(() => {
+      setPipelineTab('in_progress')
+      mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, []),
+    onRefresh: handleRefresh,
+    onToggleShortcuts: useCallback(() => setShortcutsOpen((v) => !v), []),
+    onFocusAgent: useCallback((index: number) => {
+      const cards = document.querySelectorAll<HTMLElement>('[data-agent-card]')
+      cards[index]?.focus()
+      cards[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, []),
+    openPalette: useCallback(() => setCommandPaletteOpen((v) => !v), []),
+  })
 
   function handleCompanyChange(company: Company) {
     saveSelectedCompany(company)
@@ -253,6 +275,14 @@ export default function App() {
               Last sync {new Date(dataUpdatedAt).toLocaleTimeString()}
             </span>
           )}
+          <button
+            onClick={() => setShortcutsOpen(true)}
+            className="section-label"
+            style={{ border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 6px', background: 'transparent', cursor: 'pointer', color: 'inherit' }}
+            title="Keyboard shortcuts (?)"
+          >
+            ?
+          </button>
           <kbd
             className="section-label"
             style={{ border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 6px' }}
@@ -270,7 +300,7 @@ export default function App() {
       <div className="h-px flex-shrink-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.3), transparent)' }} />
 
       {/* Main content */}
-      <main className="flex-1 px-4 pb-6 pt-4 flex flex-col gap-4 max-w-screen-2xl w-full mx-auto">
+      <main ref={mainRef} className="flex-1 px-4 pb-6 pt-4 flex flex-col gap-4 max-w-screen-2xl w-full mx-auto">
         {isLoading && <LoadingScreen />}
         {isError && (
           <ErrorScreen
@@ -297,19 +327,29 @@ export default function App() {
         {agents && (
           <>
             {/* KPI Stats Bar */}
-            <StatsBar
-              agents={agents}
-              pipelineIssues={pipelineIssues ?? []}
-              activityEvents={activityEvents ?? []}
-            />
+            <motion.div {...STAGGER} transition={{ duration: 0.2, delay: 0 }}>
+              <StatsBar
+                agents={agents}
+                pipelineIssues={pipelineIssues ?? []}
+                activityEvents={activityEvents ?? []}
+              />
+            </motion.div>
 
             {/* Agent office grid */}
-            <div className={isRefreshing ? 'refresh-shimmer rounded-xl' : ''}>
+            <motion.div
+              className={`office-section ${isRefreshing ? 'refresh-shimmer rounded-xl' : ''}`}
+              {...STAGGER}
+              transition={{ duration: 0.2, delay: 0.04 }}
+            >
               <Office agents={agents} onAgentClick={(id) => setSelectedAgentId(id)} />
-            </div>
+            </motion.div>
 
-            {/* NF2: Pipeline + Activity — two-column on sm+, single-column on mobile */}
-            <div className="pipeline-activity-grid">
+            {/* Pipeline + Activity */}
+            <motion.div
+              className="pipeline-activity-grid pipeline-section"
+              {...STAGGER}
+              transition={{ duration: 0.2, delay: 0.08 }}
+            >
               <PipelinePanel
                 issues={incidentMode
                   ? [...(pipelineIssues ?? []).filter((i) => i.status === 'blocked'), ...(pipelineIssues ?? []).filter((i) => i.status !== 'blocked')]
@@ -317,18 +357,22 @@ export default function App() {
                 agents={agents}
                 companyId={selectedCompany.id}
                 isRefreshing={isPipelineFetching}
+                activeTab={pipelineTab}
+                onTabChange={setPipelineTab}
               />
               <ActivityFeed
                 events={activityEvents ?? []}
                 isRefreshing={isActivityFetching}
               />
-            </div>
+            </motion.div>
 
             {/* Activity Heatmap */}
-            <ActivityHeatmap
-              agents={agents}
-              events={activityEvents ?? []}
-            />
+            <motion.div {...STAGGER} transition={{ duration: 0.2, delay: 0.12 }}>
+              <ActivityHeatmap
+                agents={agents}
+                events={activityEvents ?? []}
+              />
+            </motion.div>
           </>
         )}
       </main>
@@ -344,11 +388,12 @@ export default function App() {
         <span className="pixel-text" style={{ fontSize: '0.55rem', color: '#475569' }}>
           Built with Paperclip Agents
         </span>
-        {/* Keyboard shortcut strip */}
         <div className="flex items-center gap-3">
           {[
+            { key: 'N', label: 'New task' },
+            { key: 'B', label: 'Blocked' },
             { key: 'R', label: 'Refresh' },
-            { key: 'F', label: 'Search' },
+            { key: '?', label: 'Shortcuts' },
             { key: '⌘K', label: 'Command' },
           ].map(({ key, label }) => (
             <span key={key} className="pixel-text flex items-center gap-1" style={{ fontSize: '0.55rem', color: '#475569' }}>
@@ -412,6 +457,9 @@ export default function App() {
           )
         }}
       />
+
+      {/* Shortcut overlay */}
+      <ShortcutOverlay isOpen={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   )
 }

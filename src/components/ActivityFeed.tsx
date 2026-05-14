@@ -3,12 +3,12 @@ import type { ActivityEvent, ActivityEventType } from '../types'
 
 const EVENT_CONFIG: Record<
   ActivityEventType,
-  { icon: string; color: string; label: string }
+  { icon: string; color: string; label: string; borderColor: string }
 > = {
-  done: { icon: '✓', color: '#34d399', label: 'Done' },
-  blocked: { icon: '⚠', color: '#f59e0b', label: 'Blocked' },
-  assigned: { icon: '→', color: '#818cf8', label: 'Assigned' },
-  error: { icon: '✗', color: '#f87171', label: 'Error' },
+  done: { icon: '✓', color: '#34d399', label: 'Done', borderColor: 'var(--aura-done, #34d399)' },
+  blocked: { icon: '⚠', color: '#f59e0b', label: 'Blocked', borderColor: 'var(--aura-blocked, #f59e0b)' },
+  assigned: { icon: '→', color: '#818cf8', label: 'Assigned', borderColor: 'var(--accent-cyan, #22d3ee)' },
+  error: { icon: '✗', color: '#f87171', label: 'Error', borderColor: 'var(--aura-blocked, #f87171)' },
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -219,6 +219,8 @@ export function ActivityFeed({ events, isRefreshing }: Props) {
                         style={{
                           animationDelay: `${gi * 0.02 + ei * 0.03}s`,
                           backgroundColor: 'rgba(255,255,255,0.01)',
+                          borderLeft: `2px solid ${cfg.borderColor}`,
+                          paddingLeft: '10px',
                         }}
                       >
                         {/* Event type icon */}

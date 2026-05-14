@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSpring, useTransform } from 'framer-motion'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import type { Agent, ActivityEvent, Issue } from '../types'
 import { isDemoMode } from '../config'
@@ -91,6 +92,26 @@ export function StatsBar({ agents, pipelineIssues, activityEvents }: Props) {
   )
 }
 
+function SpringCounter({ value, color }: { value: number; color: string }) {
+  const spring = useSpring(value, { duration: 800, bounce: 0 })
+  const display = useTransform(spring, (v) => Math.round(v).toString())
+  const [rendered, setRendered] = useState(value.toString())
+
+  useEffect(() => {
+    spring.set(value)
+  }, [spring, value])
+
+  useEffect(() => {
+    return display.on('change', setRendered)
+  }, [display])
+
+  return (
+    <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 700, color, lineHeight: 1 }}>
+      {rendered}
+    </span>
+  )
+}
+
 function KpiTile({
   label,
   value,
@@ -121,12 +142,7 @@ function KpiTile({
       </span>
 
       <div className="flex items-baseline gap-2">
-        <span
-          className="mono"
-          style={{ fontSize: '1.6rem', fontWeight: 700, color: '#e2e8f0', lineHeight: 1 }}
-        >
-          {value}
-        </span>
+        <SpringCounter value={value} color="#e2e8f0" />
         {delta !== 0 && (
           <span
             style={{

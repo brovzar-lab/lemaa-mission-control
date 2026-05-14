@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { Issue, Agent } from '../types'
 import { patchIssue, postComment } from '../api'
 import { toast } from '../useToast'
+import { ParticleBurst } from './ParticleBurst'
 
 const PRIORITY_CHIP: Record<string, { bg: string; text: string; label: string }> = {
   critical: { bg: 'rgba(248,113,113,0.2)', text: '#f87171', label: 'CRITICAL' },
@@ -59,6 +60,7 @@ export function TaskRow({ issue, agents, companyId, isRefreshing }: Props) {
   const [showBlockedReason, setShowBlockedReason] = useState(false)
   const [blockedReason, setBlockedReason] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [burstActive, setBurstActive] = useState(false)
   const commentRef = useRef<HTMLTextAreaElement>(null)
 
   const agent = agents.find((a) => a.id === issue.assigneeAgentId)
@@ -87,6 +89,10 @@ export function TaskRow({ issue, agents, companyId, isRefreshing }: Props) {
     }
     const prev = issue.status
     optimisticUpdate({ status: newStatus })
+    if (newStatus === 'done') {
+      setBurstActive(true)
+      setTimeout(() => setBurstActive(false), 600)
+    }
     try {
       await patchIssue(issue.id, { status: newStatus })
       toast.success(`Status → ${newStatus.replace('_', ' ')}`)
@@ -143,7 +149,7 @@ export function TaskRow({ issue, agents, companyId, isRefreshing }: Props) {
 
   return (
     <div
-      className={`rounded-lg cursor-pointer transition-all duration-150 select-none ${
+      className={`rounded-lg cursor-pointer transition-all duration-150 select-none relative overflow-hidden ${
         isBlocked ? 'blocked-shimmer' : ''
       } ${isRefreshing ? 'opacity-60' : ''}`}
       style={{
@@ -156,6 +162,7 @@ export function TaskRow({ issue, agents, companyId, isRefreshing }: Props) {
       }}
       onClick={() => setExpanded((v) => !v)}
     >
+      <ParticleBurst active={burstActive} />
       {/* Main row */}
       <div className="flex items-center gap-3 px-3 py-2.5">
         {/* Agent avatar */}

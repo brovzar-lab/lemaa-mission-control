@@ -229,7 +229,7 @@ export function AgentDetailDrawer({ agent, agents, companyId, activityEvents, co
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             className="fixed right-0 top-0 bottom-0 flex flex-col overflow-y-auto"
             style={{
               width: '360px',

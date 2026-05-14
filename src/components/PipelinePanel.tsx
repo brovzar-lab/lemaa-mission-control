@@ -16,10 +16,17 @@ interface Props {
   agents: Agent[]
   companyId: string
   isRefreshing?: boolean
+  activeTab?: Tab
+  onTabChange?: (tab: Tab) => void
 }
 
-export function PipelinePanel({ issues, agents, companyId, isRefreshing }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('in_progress')
+export function PipelinePanel({ issues, agents, companyId, isRefreshing, activeTab: externalTab, onTabChange }: Props) {
+  const [internalTab, setInternalTab] = useState<Tab>('in_progress')
+  const activeTab = externalTab ?? internalTab
+  const setActiveTab = (tab: Tab) => {
+    setInternalTab(tab)
+    onTabChange?.(tab)
+  }
 
   const counts = {
     in_progress: issues.filter((i) => i.status === 'in_progress').length,
